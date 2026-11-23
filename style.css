@@ -832,6 +832,17 @@ section[id] { scroll-margin-top: 70px; }
 .chipicon { width: 18px; height: 18px; vertical-align: -4px; margin-right: 4px; }
 .picon { width: 26px; height: 26px; vertical-align: middle; margin-right: 6px; }
 
+/* ===== 敌人头像 ===== */
+.eicon {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  margin-right: 8px;
+  vertical-align: middle;
+  float: left;
+  background: var(--muted);
+}
+
 /* ===== 战术情报折叠分组 ===== */
 .intelgroup {
   border: 1px solid var(--border);

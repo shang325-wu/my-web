@@ -391,7 +391,10 @@
         group('装备', eq, eq.map(x => `<div class="pact-card"><span class="pn">${x.name}</span><span class="pt">${x.golden ? "精锐 · " : ""}价格${x.price}${x.bond ? " · " + x.bond : ""}</span><div class="pe">${x.effect}</div></div>`).join(""))
         + group('策略', st, st.map(x => `<div class="pact-card"><span class="pn">${x.name}</span><span class="pt">${x.type}</span><div class="pe">${x.desc}</div></div>`).join(""))
         + group('战术指令', bd, bd.map(x => `<div class="pact-card"><span class="pt">${x.type}</span><div class="pe">${x.desc}</div></div>`).join(""))
-        + group('敌人威胁分类', th, th.map(t => `<div class="pact-card"><span class="pn">${t.type}</span><span class="pt">${t.count}名敌人</span></div>`).join(""))
+        + group('敌人威胁分类', th, th.map(t => `
+          <div class="pact-card"><span class="pn">${t.type}</span><span class="pt">${t.enemies.length}名敌人（点击下方展开）</span></div>
+          ${t.enemies.map(e => `
+            <div class="pact-card"><img class="eicon" src="${e.img}" alt="" loading="lazy"><span class="pn">${e.name}</span><span class="pt">${e.level === "BOSS" ? "领袖" : e.level === "ELITE" ? "精英" : "普通"}${/_(2|3)$/.test(e.id) ? " · 强化版" : ""}</span><div class="pe">${e.desc}</div>${e.abilities ? `<div class="pp">${e.abilities}</div>` : ""}</div>`).join("")}`).join(""))
         + empty;
     }
     renderIntel();
