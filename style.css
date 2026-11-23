@@ -793,6 +793,40 @@ section[id] { scroll-margin-top: 70px; }
 .pact-card .pt { font-size: 11px; color: var(--text-dim); margin-left: 8px; letter-spacing: 1px; }
 .pact-card .pe { font-size: 13px; margin-top: 4px; }
 .pact-card .pp { font-size: 12px; color: var(--accent2); margin-top: 4px; }
+
+/* ===== AI 截图分析 ===== */
+.shot.sel {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.ai-text {
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.9;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  background: var(--card);
+}
+
+/* ===== 干员能力列表（盟约卡内折叠） ===== */
+.oplist { margin-top: 8px; font-size: 13px; }
+.oplist summary {
+  cursor: pointer;
+  color: var(--accent2);
+  letter-spacing: 1px;
+  user-select: none;
+}
+.oplist summary:hover { text-shadow: 0 0 6px var(--accent2); }
+.opline {
+  padding: 8px 10px;
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  background: var(--muted);
+  line-height: 1.7;
+}
+.opline b { color: var(--text); }
+.olv { color: var(--accent); font-size: 11px; margin-right: 6px; letter-spacing: 1px; }
 /* ===== 页面内录入（表单 / 按钮 / 批量导入） ===== */
 .addform {
   display: flex;
