@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>卫戍协议 - 明日方舟专区</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-ak">
+  <div class="wrap">
+
+    <div class="topbar">
+      <div>
+        <h1>卫戍协议</h1>
+        <div class="subtitle">GARRISON PROTOCOL · 明日方舟玩法专区</div>
+      </div>
+      <a class="back" href="arknights.html">&lt;&lt; 返回明日方舟专区</a>
+    </div>
+
+    <nav class="pagenav" id="pagenav">
+      <a href="#pacts">盟约查询</a>
+      <a href="#shots">对局截图</a>
+      <a href="#logs">对局记录</a>
+    </nav>
+
+    <!-- ===== 盟约查询器：勾选本局盟约 → 看效果和提示（盟约数据在页面底部 PACTS 数组里） ===== -->
+    <section id="pacts">
+      <div class="sec-title">盟约查询器</div>
+      <div class="importbox">勾选这一把出现的盟约，下方会列出效果和搭配提示。点「分析本局」汇总成分析清单。</div>
+      <input type="text" class="pact-search" id="psearch" placeholder="搜索盟约名...">
+      <div id="pactgroups"></div>
+      <div class="pact-result" id="pactresult"></div>
+    </section>
+
+    <!-- ===== 对局截图（点 + 上传，保存在浏览器里；悬停可删除） ===== -->
+    <section id="shots">
+      <div class="sec-title">对局截图</div>
+      <div class="shots" id="shotgrid"></div>
+      <input type="file" id="shotfile" accept="image/*" multiple hidden>
+    </section>
+
+    <!-- ===== 对局记录（表单录入，数据保存在浏览器里） ===== -->
+    <section id="logs">
+      <div class="sec-title">对局记录</div>
+      <form class="addform" id="lform">
+        <input type="date" id="lf_date" required>
+        <input type="text" id="lf_stage" placeholder="关卡/层数" required>
+        <input type="text" id="lf_pacts" placeholder="本局盟约（可空）" list="pactNames" size="22">
+        <select id="lf_result">
+          <option value="win">通关 ✓</option>
+          <option value="lose">失败 ✗</option>
+          <option value="giveup">放弃</option>
+        </select>
+        <input type="text" id="lf_note" placeholder="一句话感想（可空）" size="16">
+        <button class="btn" type="submit">+ 记一笔</button>
+      </form>
+      <div id="loglist"></div>
+    </section>
+
+    <!-- ===== 数据管理（录入的记录和截图都存在此浏览器，清缓存前先导出备份） ===== -->
+    <div class="databar">
+      <span>数据管理 · 录入的对局记录和截图保存在此浏览器，换电脑或清缓存前请先「导出备份」</span>
+      <button class="btn ghost" id="exp_btn" type="button">导出备份</button>
+      <button class="btn ghost" id="imp_btn" type="button">导入备份</button>
+      <button class="btn ghost" id="clr_btn" type="button">清空录入</button>
+      <input type="file" id="imp_file" accept=".json" hidden>
+    </div>
+
+    <footer>卫戍协议 · 明日方舟玩法专区</footer>
+  </div>
+
+  <!-- 点击小图时的大图层 -->
+  <div id="lightbox"><img alt=""></div>
+
+  <!-- 自动补全候选（内容由脚本自动维护） -->
+  <datalist id="pactNames"></datalist>
+
+  <!-- 盟约库数据（pacts_data.js，由 PRTS wiki 数据整理） -->
+  <script src="pacts_data.js"></script>
+  <script>
+    // ==================== 浏览器本地存取 ====================
+    const store = {
+      get(key, def) { try { return JSON.parse(localStorage.getItem(key)) ?? def } catch { return def } },
+      set(key, val) { localStorage.setItem(key, JSON.stringify(val)); },
+    };
+    const K_LOGS = "garrison_logs", K_SHOTS = "garrison_shots";
+
+    // ==================== 盟约库 ====================
+    // 数据在 pacts_data.js 里维护（PRTS wiki 盟约记录整理，23条）
+    // 新版本游戏加了新盟约时，往那个文件里照格式加一条即可
+    // 查询器、搜索、对局记录自动补全全部读取它
+
+    // ==================== 盟约查询器 ====================
+    const selected = new Set();
+    let keyword = "";
+
+    function renderPacts() {
+      const groups = document.getElementById("pactgroups");
+      document.getElementById("pactNames").innerHTML =
+        PACTS.map(p => `<option value="${p.name}">`).join("");
+
+      if (!PACTS.length) {
+        groups.innerHTML = `<div class="importbox">盟约库还是空的。把游戏里的盟约名单（名称 / 分组 / 效果）发给 AI 助手帮你整理，或直接填进本文件底部 script 里的 PACTS 数组，查询器就会亮起来。</div>`;
+        document.getElementById("pactresult").innerHTML = "";
+        return;
+      }
+
+      const kw = keyword.trim().toLowerCase();
+      const byType = {};
+      PACTS.forEach(p => {
+        if (kw && !p.name.toLowerCase().includes(kw) && !(p.type || "").toLowerCase().includes(kw)) return;
+        (byType[p.type || "未分组"] = byType[p.type || "未分组"] || []).push(p);
+      });
+      groups.innerHTML = Object.entries(byType).map(([type, list]) => `
+        <div class="pact-group">
+          <div class="pg-name">◆ ${type}（${list.length}）</div>
+          <div class="pact-chips">
+            ${list.map(p => `
+              <label class="pact-chip" title="${p.effect}">
+                <input type="checkbox" value="${p.name}" ${selected.has(p.name) ? "checked" : ""}>
+                <span>${p.name}</span>
+              </label>`).join("")}
+          </div>
+        </div>`).join("") || `<div class="importbox">没有匹配「${keyword}」的盟约</div>`;
+      renderResult();
+    }
+
+    function renderResult() {
+      const box = document.getElementById("pactresult");
+      const picked = PACTS.filter(p => selected.has(p.name));
+      if (!picked.length) {
+        box.innerHTML = `<div class="importbox">还没有勾选盟约。勾选后这里会显示每条的效果和搭配提示。</div>`;
+        return;
+      }
+      box.innerHTML = `
+        <div class="sec-title">本局分析（已选 ${picked.length} 条）</div>
+        ${picked.map(p => `
+          <div class="pact-card">
+            <span class="pn">${p.name}</span><span class="pt">${p.type || ""}</span>
+            <div class="pe">${p.effect}</div>
+            ${p.tip ? `<div class="pp">搭配提示：${p.tip}</div>` : ""}
+          </div>`).join("")}`;
+    }
+
+    document.getElementById("pactgroups").addEventListener("change", e => {
+      if (e.target.matches("input[type=checkbox]")) {
+        e.target.checked ? selected.add(e.target.value) : selected.delete(e.target.value);
+        renderResult();
+      }
+    });
+    document.getElementById("psearch").addEventListener("input", e => {
+      keyword = e.target.value;
+      renderPacts();
+    });
+    renderPacts();
+
+    // ==================== 对局截图 ====================
+    let shots = store.get(K_SHOTS, []);
+    const shotGrid = document.getElementById("shotgrid");
+    const shotFile = document.getElementById("shotfile");
+
+    function renderShots() {
+      shotGrid.innerHTML = `
+        <div class="shot up" id="shotup">+ 上传截图</div>
+        ${shots.map((s, i) => `
+          <div class="shot"><img src="${s}" alt="对局截图${i + 1}">
+            <button class="del" data-i="${i}" title="删除">✕</button>
+          </div>`).join("")}
+        ${shots.length === 0 ? `<div class="shot">点「+ 上传截图」存本局截图，图会保存在这个浏览器里</div>` : ""}`;
+    }
+    renderShots();
+
+    shotGrid.addEventListener("click", e => {
+      if (e.target.id === "shotup") shotFile.click();
+      const del = e.target.closest(".del");
+      if (del && confirm("确定删除这张截图吗？")) {
+        shots.splice(+del.dataset.i, 1);
+        store.set(K_SHOTS, shots);
+        renderShots();
+      }
+    });
+
+    // 图片压缩后再存：最长边压到 1280，JPEG 82% 质量
+    function compress(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+          const c = document.createElement("canvas");
+          c.width = Math.round(img.width * scale);
+          c.height = Math.round(img.height * scale);
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          resolve(c.toDataURL("image/jpeg", 0.82));
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+      });
+    }
+    shotFile.addEventListener("change", async () => {
+      for (const f of shotFile.files) {
+        try { shots.push(await compress(f)); }
+        catch { alert("这张图读不出来，换一张试试"); }
+      }
+      try {
+        store.set(K_SHOTS, shots);
+      } catch {
+        alert("浏览器存储快满了，删几张旧截图再传");
+        shots = store.get(K_SHOTS, []);
+      }
+      shotFile.value = "";
+      renderShots();
+    });
+
+    // ==================== 对局记录 ====================
+    let logs = store.get(K_LOGS, []);
+    const logText = { win: "通关 ✓", lose: "失败 ✗", giveup: "放弃" };
+    const logCls  = { win: "gold", lose: "off", giveup: "miss" };
+
+    function renderLogs() {
+      const box = document.getElementById("loglist");
+      box.innerHTML = logs.map((l, i) => `
+        <div class="event">
+          <div class="ephase">${l.date}</div>
+          <div class="ebody">
+            <div class="ename">${l.stage}<span class="etime ${logCls[l.result]}">${logText[l.result]}</span></div>
+            ${l.pacts ? `<div class="epool">本局盟约：${l.pacts}</div>` : ""}
+            ${l.note ? `<div class="esum">${l.note}</div>` : ""}
+          </div>
+          <button class="rowdel" data-i="${i}" title="删除这条">✕</button>
+        </div>`).join("") || `<div class="importbox">还没有对局记录，用上面的表单记一场试试</div>`;
+    }
+    renderLogs();
+
+    document.getElementById("lform").addEventListener("submit", e => {
+      e.preventDefault();
+      logs.unshift({
+        date:  document.getElementById("lf_date").value,
+        stage: document.getElementById("lf_stage").value.trim(),
+        pacts: document.getElementById("lf_pacts").value.trim(),
+        result: document.getElementById("lf_result").value,
+        note:  document.getElementById("lf_note").value.trim(),
+      });
+      store.set(K_LOGS, logs);
+      e.target.reset();
+      renderLogs();
+    });
+    document.getElementById("loglist").addEventListener("click", e => {
+      const del = e.target.closest(".rowdel");
+      if (del && confirm("删除这条对局记录？")) {
+        logs.splice(+del.dataset.i, 1);
+        store.set(K_LOGS, logs);
+        renderLogs();
+      }
+    });
+
+    // ==================== 大图查看层 ====================
+    const lightbox = document.getElementById("lightbox");
+    document.addEventListener("click", e => {
+      const img = e.target.closest(".shot img, .evimg");
+      if (img) {
+        lightbox.querySelector("img").src = img.src;
+        lightbox.classList.add("on");
+        return;
+      }
+      if (e.target.closest("#lightbox")) lightbox.classList.remove("on");
+    });
+
+    // ==================== 数据备份 ====================
+    document.getElementById("exp_btn").addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify({ logs, shots }, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "garrison-backup.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+    document.getElementById("imp_btn").addEventListener("click", () => document.getElementById("imp_file").click());
+    document.getElementById("imp_file").addEventListener("change", e => {
+      const fr = new FileReader();
+      fr.onload = () => {
+        try {
+          const data = JSON.parse(fr.result);
+          if (Array.isArray(data.logs)) { logs = data.logs; store.set(K_LOGS, logs); }
+          if (Array.isArray(data.shots)) { shots = data.shots; store.set(K_SHOTS, shots); }
+          renderLogs();
+          renderShots();
+          alert("备份已恢复");
+        } catch { alert("备份文件格式不对，选导出时下载的那个 json"); }
+      };
+      fr.readAsText(e.target.files[0]);
+      e.target.value = "";
+    });
+    document.getElementById("clr_btn").addEventListener("click", () => {
+      if (!confirm("清空所有对局记录和截图？（不影响盟约库数据）")) return;
+      localStorage.removeItem(K_LOGS);
+      localStorage.removeItem(K_SHOTS);
+      logs = []; shots = [];
+      renderLogs();
+      renderShots();
+    });
+
+    // ==================== 导航条滚动高亮 ====================
+    const navLinks = [...document.querySelectorAll("#pagenav a")];
+    const secIO = new IntersectionObserver(es => es.forEach(e => {
+      if (e.isIntersecting) {
+        navLinks.forEach(l => l.classList.toggle("active", l.hash === "#" + e.target.id));
+      }
+    }), { rootMargin: "-25% 0px -65% 0px" });
+    document.querySelectorAll("section[id]").forEach(s => secIO.observe(s));
+  </script>
+</body>
+</html>

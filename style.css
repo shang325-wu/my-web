@@ -604,6 +604,195 @@ body.theme-ak::after {
 .theme-ak ::-webkit-scrollbar-track { background: var(--bg); }
 .theme-ak ::-webkit-scrollbar-thumb { background: var(--border); }
 .theme-ak ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ==================== 全站视觉升级 ==================== */
+
+/* 各页右下角水印（文字由 --wm 决定） */
+body::after {
+  content: var(--wm, "MY GAME VAULT");
+  position: fixed;
+  right: -16px;
+  bottom: 10px;
+  font-family: "Orbitron", Consolas, monospace;
+  font-size: 80px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  color: rgba(224, 224, 224, 0.028);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+body.theme-hsr      { --wm: "STAR RAIL"; }
+body.theme-endfield { --wm: "ENDFIELD"; }
+
+/* ===== 主页 hero 横幅 ===== */
+.hero-banner {
+  position: relative;
+  padding: 42px 36px;
+  margin-bottom: 34px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(circle at 82% 18%, rgba(0, 255, 136, 0.09), transparent 50%),
+    radial-gradient(circle at 12% 85%, rgba(255, 0, 255, 0.07), transparent 50%),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, 0.014) 3px 4px),
+    var(--card);
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
+  overflow: hidden;
+}
+.hero-banner h2 {
+  font-family: "Orbitron", Consolas, monospace;
+  font-size: 32px;
+  letter-spacing: 6px;
+  color: var(--text);
+}
+.hero-banner h2 span { color: var(--accent); text-shadow: 0 0 16px var(--accent); }
+.hero-banner .tagline { color: var(--text-dim); font-size: 13px; letter-spacing: 2px; margin-top: 10px; }
+.hero-banner .tagline::before { content: "▮▮ "; color: var(--accent); }
+.hero-banner .hud {
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.hero-banner .hud i { width: 26px; height: 3px; background: var(--border); }
+.hero-banner .hud i:nth-child(2) { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.hero-banner .hud i:nth-child(3) { width: 18px; }
+
+/* ===== 主页专区卡片升级（带渐变封面区） ===== */
+.zone { padding: 0; }
+.zone .zcover {
+  height: 96px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--z) 32%, var(--card)) 0%,
+    color-mix(in srgb, var(--z) 10%, var(--card)) 55%,
+    var(--card) 100%);
+}
+.zone .zglyph {
+  font-family: "Orbitron", Consolas, monospace;
+  font-size: 44px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--z) 80%, white);
+  text-shadow: 0 0 18px var(--z);
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.zone:hover .zglyph { transform: scale(1.18); }
+.zone .ztag {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: color-mix(in srgb, var(--z) 75%, white);
+  opacity: 0.85;
+}
+.zone .zbody { padding: 16px 20px 20px; }
+.zone .zbody h2 {
+  font-family: "Orbitron", Consolas, monospace;
+  font-size: 19px;
+  margin: 0 0 6px;
+  color: var(--text);
+}
+.zone .zbody p { font-size: 13px; color: var(--text-dim); margin: 0; }
+.zone .go { display: inline-block; margin-top: 12px; font-size: 12px; color: var(--z); }
+
+/* ===== 星铁 / 终末地专页：悬停反馈与滚动条 ===== */
+.theme-hsr .notes li:hover,
+.theme-endfield .notes li:hover { filter: brightness(1.12); border-left-color: var(--accent); }
+.theme-hsr .shot:hover,
+.theme-endfield .shot:hover { border-style: solid; border-color: var(--accent); }
+.theme-hsr .fact:hover,
+.theme-endfield .fact:hover { filter: brightness(1.1); }
+.theme-hsr ::-webkit-scrollbar,
+.theme-endfield ::-webkit-scrollbar { width: 8px; height: 8px; }
+.theme-hsr ::-webkit-scrollbar-track,
+.theme-endfield ::-webkit-scrollbar-track { background: var(--bg); }
+.theme-hsr ::-webkit-scrollbar-thumb,
+.theme-endfield ::-webkit-scrollbar-thumb { background: var(--border); }
+.theme-hsr ::-webkit-scrollbar-thumb:hover,
+.theme-endfield ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* 专页页面内导航条复用（与明日方舟页一致） */
+section[id] { scroll-margin-top: 70px; }
+
+/* ===== 卫戍协议专区入口链接（明日方舟专页内） ===== */
+.go-zone {
+  display: inline-block;
+  margin: -8px 0 14px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.go-zone:hover { text-shadow: 0 0 8px var(--accent); }
+
+/* ===== 盟约查询器 ===== */
+.pact-search {
+  width: min(360px, 100%);
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+.pact-search:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.pact-group { margin-bottom: 14px; }
+.pact-group .pg-name {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.pact-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pact-chip { position: relative; }
+.pact-chip input { position: absolute; opacity: 0; width: 0; height: 0; }
+.pact-chip span {
+  display: inline-block;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 150ms;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+.pact-chip input:checked + span {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #14160e;
+  font-weight: bold;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.pact-chip span:hover { border-color: var(--accent); color: var(--accent); }
+.pact-chip input:checked + span:hover { color: #14160e; }
+.pact-result { margin-top: 20px; }
+.pact-card {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  background: var(--card);
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  animation: fadein 300ms ease-out;
+}
+.pact-card .pn { color: var(--accent); font-weight: bold; font-size: 14px; }
+.pact-card .pt { font-size: 11px; color: var(--text-dim); margin-left: 8px; letter-spacing: 1px; }
+.pact-card .pe { font-size: 13px; margin-top: 4px; }
+.pact-card .pp { font-size: 12px; color: var(--accent2); margin-top: 4px; }
 /* ===== 页面内录入（表单 / 按钮 / 批量导入） ===== */
 .addform {
   display: flex;
