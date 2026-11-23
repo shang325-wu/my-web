@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>明日方舟 - 我的游戏档案</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-ak">
+  <div class="wrap">
+
+    <div class="topbar">
+      <div>
+        <h1>明日方舟</h1>
+        <div class="subtitle">ARKNIGHTS · 鹰角网络</div>
+      </div>
+      <a class="back" href="index.html">&lt;&lt; 返回主页</a>
+    </div>
+
+    <!-- ===== 板块导航条（滚动到对应板块会自动高亮） ===== -->
+    <nav class="pagenav" id="pagenav">
+      <a href="#milestones">里程碑</a>
+      <a href="#ops">本命干员</a>
+      <a href="#gacha">抽卡流水</a>
+      <a href="#events">活动档案</a>
+      <a href="#rant">卫戍协议</a>
+      <a href="#notes">我的记录</a>
+      <a href="#shots">截图墙</a>
+    </nav>
+
+    <div class="hero">
+      <!-- 想换封面图：把图片放进 covers 文件夹，然后改成 <img src="covers/ak.jpg"> -->
+      <div class="poster" style="background:linear-gradient(135deg,#2e343e,#1a1d24)">舟</div>
+      <div>
+        <h2>罗德岛值班日志</h2>
+        <div class="en">Dr. 博士，基建不等人。</div>
+      </div>
+    </div>
+
+    <!-- ===== 里程碑（数字自动从0滚动） ===== -->
+    <section id="milestones">
+      <div class="sec-title">里程碑</div>
+      <div class="milestones" id="ms"></div>
+    </section>
+
+    <!-- ===== 本命干员 ===== -->
+    <section id="ops">
+      <div class="sec-title">本命干员墙</div>
+
+      <!-- 本月值班干员（大卡轮播，数据在页面底部 script 的 featured 里改） -->
+      <div class="featured" id="featured"></div>
+
+      <div class="ops">
+        <!-- 加一个干员：复制一个整段 <div class="op">...</div> 改内容
+             立绘：把图片放进 covers 文件夹，把占位 div 换成 <img src="covers/干员名.jpg"> -->
+        <div class="op">
+          <div class="art" style="background:linear-gradient(135deg,#2e343e,#1c2128)">立绘位</div>
+          <div class="opinfo">
+            <div class="opname">棘刺</div>
+            <div class="opclass">近卫 · 剑豪</div>
+            <div class="lv">精二 90 · 专三</div>
+            <div class="opfav">永远的神，什么图都能塞。</div>
+          </div>
+        </div>
+        <div class="op">
+          <div class="art" style="background:linear-gradient(135deg,#333a46,#1c2128)">立绘位</div>
+          <div class="opinfo">
+            <div class="opname">凯尔希</div>
+            <div class="opclass">医疗 · 领袖</div>
+            <div class="lv">精二 90 · 专三</div>
+            <div class="opfav">Mon3tr 在，安全感就在。</div>
+          </div>
+        </div>
+        <div class="op">
+          <div class="art" style="background:linear-gradient(135deg,#3a4148,#1c2128)">立绘位</div>
+          <div class="opinfo">
+            <div class="opname">玛恩纳</div>
+            <div class="opclass">近卫 · 重装</div>
+            <div class="lv">精二 90 · 专三</div>
+            <div class="opfav">被动蹲好，全屏清空。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 抽卡流水（表单录入，数据保存在浏览器里；想改示例数据才动底部 script 里的数组） ===== -->
+    <section id="gacha">
+      <div class="sec-title">抽卡流水</div>
+
+      <form class="addform" id="gform">
+        <input type="date" id="gf_date" required>
+        <input type="text" id="gf_pool" placeholder="卡池名（录过的会自动补全）" list="poolList" required>
+        <input type="number" id="gf_pulls" placeholder="抽数" min="1" required>
+        <select id="gf_result">
+          <option value="gold">出金 ✓</option>
+          <option value="off">歪了 ✗</option>
+          <option value="miss">没出 ✗</option>
+        </select>
+        <input type="text" id="gf_note" placeholder="备注（可空）" size="18">
+        <input type="file" id="gf_shot" accept="image/*" hidden>
+        <button class="btn ghost" type="button" id="gf_shotbtn">附寻访截图</button>
+        <button class="btn" type="submit">+ 记一笔</button>
+      </form>
+
+      <details class="importbox">
+        <summary>批量导入（从备忘录复制粘贴，每行一条）</summary>
+        <textarea id="gbulk" placeholder="每行一条，竖线分隔：日期|卡池|抽数|结果(gold/off/miss)|备注可空&#10;例：2026-03|限定寻访|96|gold|大保底出"></textarea>
+        <button class="btn ghost" id="gbulk_btn" type="button">导入</button>
+        <span id="gbulk_msg"></span>
+      </details>
+
+      <div class="stats" id="gstats"></div>
+      <div class="chart" id="chart"></div>
+      <table class="gtable">
+        <thead>
+          <tr><th>日期</th><th>卡池</th><th>抽数</th><th>结果</th><th>备注</th><th>凭证</th><th></th></tr>
+        </thead>
+        <tbody id="gbody"></tbody>
+      </table>
+    </section>
+
+    <!-- ===== 活动档案（每期活动一条，页面上直接录） ===== -->
+    <section id="events">
+      <div class="sec-title">活动档案</div>
+
+      <form class="addform" id="eform">
+        <input type="text" id="ef_phase" placeholder="期数，如 2026冬活" required>
+        <input type="text" id="ef_name" placeholder="活动名（录过的会自动补全）" list="eventList" required>
+        <input type="text" id="ef_time" placeholder="起止时间，如 11月~12月">
+        <input type="text" id="ef_pool" placeholder="关联卡池（可空）" list="poolList">
+        <input type="text" id="ef_sum" placeholder="一句话总结（可空）" size="18">
+        <button class="btn" type="submit">+ 记一期</button>
+      </form>
+
+      <div id="eventlist"></div>
+    </section>
+
+    <!-- ===== 卫戍协议吐槽墙（复制一个 <div class="rant"> 就能加新吐槽） ===== -->
+    <section id="rant">
+      <div class="sec-title">卫戍协议吐槽墙</div>
+      <div class="rant">
+        <div class="rt">卡关三天的Boss</div>
+        <div class="rd">2026-11-18</div>
+        <div class="rb">配置没问题，手有问题。看攻略博主打得行云流水，自己一上手就是灾难现场。</div>
+      </div>
+      <div class="rant">
+        <div class="rt">差一刀的遗憾</div>
+        <div class="rd">2026-11-02</div>
+        <div class="rb">时限还剩十秒，格子还剩一格血。学会了：下次提前把高台位清出来。</div>
+      </div>
+    </section>
+
+    <!-- ===== 我的记录（复制一个 <li> 就能加新记录） ===== -->
+    <section id="notes">
+      <div class="sec-title">我的记录</div>
+      <ul class="notes">
+        <li><span class="date">2026-11-18</span>活动复刻打完了，搬空商店。</li>
+        <li><span class="date">2026-11-05</span>危机合约又摆烂了，18 不强求。</li>
+      </ul>
+    </section>
+
+    <!-- ===== 截图墙（点 + 上传截图，保存在浏览器里；上传后悬停可删除） ===== -->
+    <section id="shots">
+      <div class="sec-title">截图墙</div>
+      <div class="shots" id="shotgrid"></div>
+      <input type="file" id="shotfile" accept="image/*" multiple hidden>
+    </section>
+
+    <!-- ===== 数据管理（录入的数据都存在此浏览器，清缓存前先导出备份） ===== -->
+    <div class="databar">
+      <span>数据管理 · 录入的抽卡/活动/截图保存在此浏览器，换电脑或清缓存前请先「导出备份」</span>
+      <button class="btn ghost" id="exp_btn" type="button">导出备份</button>
+      <button class="btn ghost" id="imp_btn" type="button">导入备份</button>
+      <button class="btn ghost" id="clr_btn" type="button">清空录入</button>
+      <input type="file" id="imp_file" accept=".json" hidden>
+    </div>
+
+    <footer>明日方舟 · 个人记录页</footer>
+  </div>
+
+  <!-- 点击小图时的大图层 -->
+  <div id="lightbox"><img alt=""></div>
+
+  <!-- 自动补全候选（内容由脚本自动维护） -->
+  <datalist id="poolList"></datalist>
+  <datalist id="eventList"></datalist>
+
+  <script>
+    // ==================== 浏览器本地存取 ====================
+    const store = {
+      get(key, def) { try { return JSON.parse(localStorage.getItem(key)) ?? def } catch { return def } },
+      set(key, val) { localStorage.setItem(key, JSON.stringify(val)); },
+    };
+    const K_GACHA = "ak_gacha", K_EVENTS = "ak_events", K_SHOTS = "ak_shots";
+
+    // ==================== 自动补全候选维护 ====================
+    function refreshDatalist(id, values) {
+      document.getElementById(id).innerHTML =
+        [...new Set(values.filter(Boolean))].map(v => `<option value="${v}">`).join("");
+    }
+
+    // ==================== 里程碑数据 ====================
+    // target 填数字（会自动滚动），纯文字的用 text 字段
+    const miles = [
+      { target: 2400, suffix: "+",  label: "注册天数" },
+      { target: 300,  suffix: "+",  label: "干员数" },
+      { target: 14,   suffix: " 章", label: "主线进度" },
+      { text: "满级",               label: "基建" },
+    ];
+    document.getElementById("ms").innerHTML = miles.map(m => `
+      <div class="mile">
+        <b>${m.text !== undefined ? m.text : `<span class="num" data-target="${m.target}">0</span>${m.suffix}`}</b>
+        <span>${m.label}</span>
+      </div>`).join("");
+
+    const easeOut = p => 1 - Math.pow(1 - p, 3);
+    function rollNum(el) {
+      const target = +el.dataset.target, dur = 1400, t0 = performance.now();
+      (function step(now) {
+        const p = Math.min(1, (now - t0) / dur);
+        el.textContent = Math.round(target * easeOut(p));
+        if (p < 1) requestAnimationFrame(step);
+      })(t0);
+    }
+    const numIO = new IntersectionObserver(es => es.forEach(e => {
+      if (e.isIntersecting) { rollNum(e.target); numIO.unobserve(e.target); }
+    }), { threshold: 0.4 });
+    document.querySelectorAll(".num").forEach(el => numIO.observe(el));
+
+    // ==================== 本月值班干员（大卡轮播） ====================
+    // 加一个干员就在数组里加一项；art 填立绘路径如 "covers/羊.jpg"，留空显示占位字
+    const featured = [
+      { name: "艾雅法拉", cls: "术师 · 火山", lv: "精二 90 · 专三", quote: "小羊开火山，清场只要十秒。", bg: "linear-gradient(135deg,#343b45,#1e222a)", art: "" },
+      { name: "史尔特尔", cls: "近卫 · 熔火", lv: "精二 90 · 专三", quote: "黄昏降临，Boss 蒸发。", bg: "linear-gradient(135deg,#3d3a33,#1e1d18)", art: "" },
+      { name: "浊心斯卡蒂", cls: "辅助 · 涌潮", lv: "精二 90 · 专三", quote: "红蒂一挂，全队永动。", bg: "linear-gradient(135deg,#2c333d,#1a1f27)", art: "" },
+    ];
+    const featBox = document.getElementById("featured");
+    let fi = 0, featTimer;
+
+    function renderFeatured() {
+      const f = featured[fi];
+      featBox.innerHTML = `
+        <div class="fart" style="background:${f.bg}">
+          ${f.art ? `<img src="${f.art}" alt="${f.name}">` : `<div class="ph">${f.name[0]}</div>`}
+        </div>
+        <div class="finfo">
+          <div class="ftag">本月值班干员 · ON DUTY</div>
+          <div class="fname">${f.name}</div>
+          <div class="fcls">${f.cls}</div>
+          <div class="flv">${f.lv}</div>
+          <div class="fquote">${f.quote}</div>
+        </div>
+        <div class="fdots">${featured.map((_, i) => `<i class="${i === fi ? "on" : ""}" data-i="${i}"></i>`).join("")}</div>
+        <div class="fnav">
+          <button data-d="-1">&lt;</button>
+          <button data-d="1">&gt;</button>
+        </div>`;
+    }
+    function nextFeat(d) { fi = (fi + d + featured.length) % featured.length; renderFeatured(); }
+    featBox.addEventListener("click", e => {
+      const btn = e.target.closest("[data-d]"), dot = e.target.closest("[data-i]");
+      if (btn) nextFeat(+btn.dataset.d);
+      if (dot) { fi = +dot.dataset.i; renderFeatured(); }
+    });
+    function autoFeat() { clearInterval(featTimer); featTimer = setInterval(() => nextFeat(1), 6000); }
+    renderFeatured();
+    autoFeat();
+
+    // ==================== 抽卡流水 ====================
+    // 下面是初始示例数据（只在想改示例时动它）；平时直接在页面上方的表单里录，
+    // 表单录入的记录保存在浏览器 localStorage，统计/柱状图/表格全部自动重算
+    // result 只能填 "gold"（出金）、"off"（歪了）、"miss"（没出）
+    const baseGacha = [
+      { date: "2026-11", pool: "限定寻访", pulls: 68,  result: "gold", note: "保底前出了，欧了" },
+      { date: "2026-09", pool: "常驻池",   pulls: 120, result: "off",  note: "歪成常驻，心态没了" },
+      { date: "2026-07", pool: "限定寻访", pulls: 34,  result: "gold", note: "这波是真的欧" },
+      { date: "2026-05", pool: "新干员池", pulls: 80,  result: "miss", note: "井都没垫到，罢游三天" },
+    ];
+    const labels = { gold: "出金 ✓", off: "歪了 ✗", miss: "没出 ✗" };
+    const cls    = { gold: "gold", off: "off", miss: "miss" };
+    const colors = { gold: "#ffd700", off: "#ff6633", miss: "#6b7280" };
+
+    let extraGacha = store.get(K_GACHA, []);
+    let events = store.get(K_EVENTS, []);
+
+    function renderGacha() {
+      const all = [...extraGacha, ...baseGacha];
+      refreshDatalist("poolList", [...all.map(g => g.pool), ...events.map(e => e.pool)]);
+
+      const total = all.reduce((s, g) => s + g.pulls, 0);
+      const gold  = all.filter(g => g.result === "gold").length;
+      const luck  = gold ? Math.round(total / gold) : "—";
+      const worst = Math.max(...all.map(g => g.pulls));
+      document.getElementById("gstats").innerHTML = `
+        <div class="stat"><b>${total}</b>总抽数</div>
+        <div class="stat"><b>${gold}</b>出金数</div>
+        <div class="stat"><b>${luck}</b>平均每金</div>
+        <div class="stat"><b>${worst}</b>最非一发</div>`;
+
+      const maxPulls = Math.max(...all.map(g => g.pulls));
+      document.getElementById("chart").innerHTML = all.map((g, i) => `
+        <div class="bar" title="${g.date} ${g.pool} ${g.pulls}抽">
+          <div class="num">${g.pulls}</div>
+          <div class="col" style="--c:${colors[g.result]}; height:${Math.round(g.pulls / maxPulls * 100)}%; animation-delay:${i * 90}ms"></div>
+          <div class="pool">${g.pool}</div>
+        </div>`).join("");
+
+      document.getElementById("gbody").innerHTML = all.map((g, i) => `
+        <tr>
+          <td>${g.date}</td>
+          <td>${g.pool}</td>
+          <td>${g.pulls}</td>
+          <td class="${cls[g.result]}">${labels[g.result]}</td>
+          <td>${g.note}</td>
+          <td>${g.shot ? `<img class="ev" src="${g.shot}" alt="寻访截图" title="点击放大">` : ""}</td>
+          <td class="opcol">${i < extraGacha.length ? `<button class="rowdel" data-i="${i}" title="删除这条">✕</button>` : ""}</td>
+        </tr>`).join("");
+    }
+    renderGacha();
+
+    // 单条录入（可附一张寻访记录截图）
+    let pendingShot = null;
+    const gfShotBtn = document.getElementById("gf_shotbtn");
+    document.getElementById("gf_shotbtn").addEventListener("click", () => document.getElementById("gf_shot").click());
+    document.getElementById("gf_shot").addEventListener("change", async e => {
+      if (!e.target.files[0]) return;
+      try {
+        pendingShot = await compress(e.target.files[0]);
+        gfShotBtn.textContent = "已附截图 ✓";
+      } catch { alert("这张图读不出来，换一张试试"); }
+      e.target.value = "";
+    });
+
+    document.getElementById("gform").addEventListener("submit", e => {
+      e.preventDefault();
+      extraGacha.unshift({
+        date:   document.getElementById("gf_date").value,
+        pool:   document.getElementById("gf_pool").value.trim(),
+        pulls:  +document.getElementById("gf_pulls").value,
+        result: document.getElementById("gf_result").value,
+        note:   document.getElementById("gf_note").value.trim(),
+        shot:   pendingShot || "",
+      });
+      store.set(K_GACHA, extraGacha);
+      e.target.reset();
+      pendingShot = null;
+      gfShotBtn.textContent = "附寻访截图";
+      renderGacha();
+    });
+
+    // 删除单条录入的记录（悬停行尾出现 ✕）
+    document.getElementById("gbody").addEventListener("click", e => {
+      const del = e.target.closest(".rowdel");
+      if (del && confirm("删除这条抽卡记录？（示例数据不可删）")) {
+        extraGacha.splice(+del.dataset.i, 1);
+        store.set(K_GACHA, extraGacha);
+        renderGacha();
+      }
+    });
+
+    // 批量导入：每行一条，竖线分隔 日期|卡池|抽数|结果|备注
+    document.getElementById("gbulk_btn").addEventListener("click", () => {
+      const lines = document.getElementById("gbulk").value.trim().split("\n").filter(Boolean);
+      let ok = 0, bad = 0;
+      for (const line of lines) {
+        const [date, pool, pulls, result, note] = line.split("|").map(s => (s || "").trim());
+        if (date && pool && +pulls > 0 && ["gold", "off", "miss"].includes(result)) {
+          extraGacha.unshift({ date, pool, pulls: +pulls, result, note: note || "" });
+          ok++;
+        } else bad++;
+      }
+      store.set(K_GACHA, extraGacha);
+      document.getElementById("gbulk").value = "";
+      document.getElementById("gbulk_msg").textContent = `导入 ${ok} 条` + (bad ? `，跳过格式错误的 ${bad} 条` : "");
+      renderGacha();
+    });
+
+    // ==================== 活动档案 ====================
+    function renderEvents() {
+      refreshDatalist("eventList", events.map(e => e.name));
+      refreshDatalist("poolList", [...baseGacha.map(g => g.pool), ...extraGacha.map(g => g.pool), ...events.map(e => e.pool)]);
+      document.getElementById("eventlist").innerHTML = events.map((ev, i) => `
+        <div class="event">
+          <div class="ephase">${ev.phase}</div>
+          <div class="ebody">
+            <div class="ename">${ev.name}<span class="etime">${ev.time}</span></div>
+            ${ev.pool ? `<div class="epool">关联卡池：${ev.pool}</div>` : ""}
+            ${ev.sum ? `<div class="esum">${ev.sum}</div>` : ""}
+          </div>
+          <button class="rowdel" data-ev="${i}" title="删除这期">✕</button>
+        </div>`).join("") || `<div class="importbox">还没有活动记录，用上面的表单记一期试试</div>`;
+    }
+    renderEvents();
+
+    document.getElementById("eform").addEventListener("submit", e => {
+      e.preventDefault();
+      events.unshift({
+        phase: document.getElementById("ef_phase").value.trim(),
+        name:  document.getElementById("ef_name").value.trim(),
+        time:  document.getElementById("ef_time").value.trim(),
+        pool:  document.getElementById("ef_pool").value.trim(),
+        sum:   document.getElementById("ef_sum").value.trim(),
+      });
+      store.set(K_EVENTS, events);
+      e.target.reset();
+      renderEvents();
+    });
+    document.getElementById("eventlist").addEventListener("click", e => {
+      const del = e.target.closest(".rowdel");
+      if (del && confirm("删除这期活动记录？")) {
+        events.splice(+del.dataset.ev, 1);
+        store.set(K_EVENTS, events);
+        renderEvents();
+      }
+    });
+
+    // ==================== 截图墙 ====================
+    let shots = store.get(K_SHOTS, []);
+    const shotGrid = document.getElementById("shotgrid");
+    const shotFile = document.getElementById("shotfile");
+
+    function renderShots() {
+      shotGrid.innerHTML = `
+        <div class="shot up" id="shotup">+ 上传截图</div>
+        ${shots.map((s, i) => `
+          <div class="shot"><img src="${s}" alt="截图${i + 1}">
+            <button class="del" data-i="${i}" title="删除">✕</button>
+          </div>`).join("")}
+        ${shots.length === 0 ? `<div class="shot">点左边的「+ 上传截图」试试，图会保存在这个浏览器里</div>` : ""}`;
+    }
+    renderShots();
+
+    shotGrid.addEventListener("click", e => {
+      if (e.target.id === "shotup") shotFile.click();
+      const del = e.target.closest(".del");
+      if (del && confirm("确定删除这张截图吗？")) {
+        shots.splice(+del.dataset.i, 1);
+        store.set(K_SHOTS, shots);
+        renderShots();
+      }
+    });
+
+    // 图片压缩后再存（避免占满浏览器存储）：最长边压到 1280，JPEG 82% 质量
+    function compress(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+          const c = document.createElement("canvas");
+          c.width = Math.round(img.width * scale);
+          c.height = Math.round(img.height * scale);
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          resolve(c.toDataURL("image/jpeg", 0.82));
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+      });
+    }
+    shotFile.addEventListener("change", async () => {
+      for (const f of shotFile.files) {
+        try { shots.push(await compress(f)); }
+        catch { alert("这张图读不出来，换一张试试"); }
+      }
+      try {
+        store.set(K_SHOTS, shots);
+      } catch {
+        alert("浏览器存储快满了，删几张旧截图再传");
+        shots = store.get(K_SHOTS, []);
+      }
+      shotFile.value = "";
+      renderShots();
+    });
+
+    // ==================== 大图查看层（点缩略图放大，点任意处关闭） ====================
+    const lightbox = document.getElementById("lightbox");
+    document.addEventListener("click", e => {
+      const ev = e.target.closest(".ev, .evimg");
+      if (ev) {
+        lightbox.querySelector("img").src = ev.src;
+        lightbox.classList.add("on");
+        return;
+      }
+      if (e.target.closest("#lightbox")) lightbox.classList.remove("on");
+    });
+
+    // ==================== 数据备份（导出/导入/清空） ====================
+    document.getElementById("exp_btn").addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify({ gacha: extraGacha, events, shots }, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "arknights-backup.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+    document.getElementById("imp_btn").addEventListener("click", () => document.getElementById("imp_file").click());
+    document.getElementById("imp_file").addEventListener("change", e => {
+      const fr = new FileReader();
+      fr.onload = () => {
+        try {
+          const data = JSON.parse(fr.result);
+          if (Array.isArray(data.gacha)) { extraGacha = data.gacha; store.set(K_GACHA, extraGacha); }
+          if (Array.isArray(data.events)) { events = data.events; store.set(K_EVENTS, events); }
+          if (Array.isArray(data.shots)) { shots = data.shots; store.set(K_SHOTS, shots); }
+          renderGacha();
+          renderEvents();
+          renderShots();
+          alert("备份已恢复");
+        } catch { alert("备份文件格式不对，选导出时下载的那个 json"); }
+      };
+      fr.readAsText(e.target.files[0]);
+      e.target.value = "";
+    });
+    document.getElementById("clr_btn").addEventListener("click", () => {
+      if (!confirm("清空所有页面录入的抽卡记录、活动档案和上传的截图？（初始示例数据不受影响）")) return;
+      localStorage.removeItem(K_GACHA);
+      localStorage.removeItem(K_EVENTS);
+      localStorage.removeItem(K_SHOTS);
+      extraGacha = []; events = []; shots = [];
+      renderGacha();
+      renderEvents();
+      renderShots();
+    });
+
+    // ==================== 导航条滚动高亮 ====================
+    const navLinks = [...document.querySelectorAll("#pagenav a")];
+    const secIO = new IntersectionObserver(es => es.forEach(e => {
+      if (e.isIntersecting) {
+        navLinks.forEach(l => l.classList.toggle("active", l.hash === "#" + e.target.id));
+      }
+    }), { rootMargin: "-25% 0px -65% 0px" });
+    document.querySelectorAll("section[id]").forEach(s => secIO.observe(s));
+  </script>
+</body>
+</html>

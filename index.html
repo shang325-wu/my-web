@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我的游戏档案</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="topbar">
+      <div>
+        <h1>MY GAME VAULT</h1>
+        <div class="subtitle">// 我的游戏档案 · 私人记录</div>
+      </div>
+    </div>
+
+    <!-- 统计（由下面的脚本自动计算，不用手动改） -->
+    <div class="stats" id="stats"></div>
+
+    <!-- ===== 游戏专区 ===== -->
+    <div class="sec-title">游戏专区</div>
+    <div class="zones">
+      <a class="zone" href="hsr.html" style="--z:#00d4ff">
+        <div class="tag">专区 01</div>
+        <h2>崩坏：星穹铁道</h2>
+        <p>米哈游 · 回合制 · 星际列车之旅</p>
+        <span class="go">进入专区 &gt;&gt;</span>
+        <div class="glyph">星</div>
+      </a>
+      <a class="zone" href="arknights.html" style="--z:#ccff00">
+        <div class="tag">专区 02</div>
+        <h2>明日方舟</h2>
+        <p>鹰角网络 · 塔防策略 · 罗德岛</p>
+        <span class="go">进入专区 &gt;&gt;</span>
+        <div class="glyph">舟</div>
+      </a>
+      <a class="zone" href="endfield.html" style="--z:#ff8800">
+        <div class="tag">专区 03</div>
+        <h2>明日方舟：终末地</h2>
+        <p>鹰角网络 · 3D冒险 · 工业建设</p>
+        <span class="go">进入专区 &gt;&gt;</span>
+        <div class="glyph">终</div>
+      </a>
+    </div>
+
+    <!-- ===== 其他游戏收藏墙（数据在 games.js 里改） ===== -->
+    <div class="sec-title">收藏墙</div>
+    <div class="wall" id="wall"></div>
+
+    <footer>CODED BY ME · POWERED BY 双击即开</footer>
+  </div>
+
+  <script src="games.js"></script>
+  <script>
+    const statusText = { playing: "在玩", done: "已通关", wish: "想玩", dropped: "弃坑" };
+    // 每个游戏自动生成一个好看的渐变色（按名字哈希）
+    function gradient(name) {
+      let h = 0;
+      for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360;
+      return `linear-gradient(135deg, hsl(${h} 80% 30%), hsl(${(h + 70) % 360} 80% 18%))`;
+    }
+
+    // 统计
+    const count = s => games.filter(g => g.status === s).length;
+    document.getElementById("stats").innerHTML = `
+      <div class="stat"><b>${games.length}</b>收录</div>
+      <div class="stat"><b>${count("playing")}</b>在玩</div>
+      <div class="stat"><b>${count("done")}</b>通关</div>
+      <div class="stat"><b>${count("wish")}</b>想玩</div>
+      <div class="stat"><b>${count("dropped")}</b>弃坑</div>`;
+
+    // 收藏墙
+    document.getElementById("wall").innerHTML = games.map(g => `
+      <div class="gcard">
+        <div class="cover" style="background:${gradient(g.name)}">
+          ${g.cover ? `<img src="${g.cover}" alt="${g.name}">` : g.name[0]}
+        </div>
+        <div class="info">
+          <div class="gname">${g.name}</div>
+          <div class="meta">
+            <span class="badge badge-${g.status}">${statusText[g.status]}</span>
+            <span>${g.platform}</span>
+            <span>${"★".repeat(g.rating) || "未评分"}</span>
+          </div>
+          ${g.comment ? `<div class="comment">${g.comment}</div>` : ""}
+          ${g.page ? `<a class="link" href="${g.page}">查看专页 &gt;&gt;</a>` : ""}
+        </div>
+      </div>`).join("");
+  </script>
+</body>
+</html>
