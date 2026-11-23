@@ -328,22 +328,23 @@
       }
     });
 
-    // ==================== 战术情报 ====================
+    // ==================== 战术情报（折叠式，默认收起，搜索时自动展开） ====================
     let intelKw = "";
     function renderIntel() {
       const box = document.getElementById("intelbody");
       const kw = intelKw.trim().toLowerCase();
       const f = arr => arr.filter(x => !kw || JSON.stringify(x).toLowerCase().includes(kw));
-      const eq = f(EQUIPS), st = f(STRATS), bd = f(BANDS);
-      box.innerHTML = `
-        <div class="sec-title">装备（${eq.length}）</div>
-        ${eq.map(x => `<div class="pact-card"><span class="pn">${x.name}</span><span class="pt">${x.golden ? "精锐 · " : ""}价格${x.price}${x.bond ? " · " + x.bond : ""}</span><div class="pe">${x.effect}</div></div>`).join("") || '<div class="importbox">无匹配</div>'}
-        <div class="sec-title">策略（${st.length}）</div>
-        ${st.map(x => `<div class="pact-card"><span class="pn">${x.name}</span><span class="pt">${x.type}</span><div class="pe">${x.desc}</div></div>`).join("") || '<div class="importbox">无匹配</div>'}
-        <div class="sec-title">战术卡（${bd.length}）</div>
-        ${bd.map(x => `<div class="pact-card"><span class="pt">${x.type}</span><div class="pe">${x.desc}</div></div>`).join("") || '<div class="importbox">无匹配</div>'}
-        <div class="sec-title">敌人威胁分类</div>
-        ${THREATS.map(t => `<div class="pact-card"><span class="pn">${t.type}</span><span class="pt">${t.count}名敌人</span></div>`).join("")}`;
+      const eq = f(EQUIPS), st = f(STRATS), bd = f(BANDS), th = f(THREATS);
+      const open = kw ? " open" : "";
+      const group = (title, items, inner) =>
+        `<details class="intelgroup"${items.length && open ? " open" : ""}><summary>${title}（${items.length}）${kw && !items.length ? " — 无匹配" : ""}</summary><div class="igbody">${inner || '<div class="importbox">无匹配</div>'}</div></details>`;
+      const empty = kw ? "" : '<div class="importbox">点击上方分类展开查看；输入关键词搜索会自动展开匹配项</div>';
+      box.innerHTML =
+        group('装备', eq, eq.map(x => `<div class="pact-card"><span class="pn">${x.name}</span><span class="pt">${x.golden ? "精锐 · " : ""}价格${x.price}${x.bond ? " · " + x.bond : ""}</span><div class="pe">${x.effect}</div></div>`).join(""))
+        + group('策略', st, st.map(x => `<div class="pact-card"><span class="pn">${x.name}</span><span class="pt">${x.type}</span><div class="pe">${x.desc}</div></div>`).join(""))
+        + group('战术卡', bd, bd.map(x => `<div class="pact-card"><span class="pt">${x.type}</span><div class="pe">${x.desc}</div></div>`).join(""))
+        + group('敌人威胁分类', th, th.map(t => `<div class="pact-card"><span class="pn">${t.type}</span><span class="pt">${t.count}名敌人</span></div>`).join(""))
+        + empty;
     }
     renderIntel();
     document.getElementById("isearch").addEventListener("input", e => { intelKw = e.target.value; renderIntel(); });

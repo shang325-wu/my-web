@@ -827,6 +827,28 @@ section[id] { scroll-margin-top: 70px; }
 }
 .opline b { color: var(--text); }
 .olv { color: var(--accent); font-size: 11px; margin-right: 6px; letter-spacing: 1px; }
+
+/* ===== 战术情报折叠分组 ===== */
+.intelgroup {
+  border: 1px solid var(--border);
+  background: var(--card);
+  margin-bottom: 12px;
+}
+.intelgroup summary {
+  cursor: pointer;
+  padding: 12px 16px;
+  font-family: "Orbitron", Consolas, monospace;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  user-select: none;
+  list-style: none;
+}
+.intelgroup summary::before { content: "▸ "; color: var(--text-dim); }
+.intelgroup[open] summary::before { content: "▾ "; }
+.intelgroup summary::-webkit-details-marker { display: none; }
+.intelgroup summary:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.intelgroup .igbody { padding: 4px 16px 14px; }
 /* ===== 页面内录入（表单 / 按钮 / 批量导入） ===== */
 .addform {
   display: flex;
