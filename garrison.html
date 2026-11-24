@@ -28,7 +28,7 @@
     <!-- ===== AI 截图分析（上传截图，AI 结合盟约库分析本局玩法） ===== -->
     <section id="ai">
       <div class="sec-title">AI 截图分析</div>
-      <div class="importbox">选一张本局截图（盟约选择/准备界面最佳，盟约栏完整清晰）。判定规则：截图里盟约显示为【绿色】才是可选的，不是绿色的都不能选。AI 会先输出绿色/非绿色两组识别清单，再只基于绿色盟约给出推荐。API Key 只保存在你自己的浏览器里，不会被写进网页文件。</div>
+      <div class="importbox">选一张本局截图（『确认本局信息』界面最佳）。AI 会识别：全部盟约池、带『阵容不完整』角标的盟约、敌方领袖、特训敌人类型，并结合干员获取等阶给出本局建议。API Key 只保存在你自己的浏览器里，不会被写进网页文件。</div>
       <div class="addform">
         <input type="password" id="ai_key" placeholder="API Key（智谱）" size="24">
         <select id="ai_model" title="选择分析模型"></select>
@@ -39,7 +39,7 @@
       <div class="shots" id="aipick"></div>
       <input type="file" id="aifile" accept="image/*" hidden>
 
-      <div style="margin: 14px 0;"><button class="btn" id="ai_run" type="button">AI 分析这把 &gt;&gt;</button><label style="margin-left: 14px; font-size: 12px; color: var(--text-dim); cursor: pointer; user-select: none;"><input type="checkbox" id="ai_green"> 绿色增强（非绿部分变灰，突出可选盟约）</label><label style="margin-left: 12px; font-size: 12px; color: var(--text-dim); cursor: pointer; user-select: none;"><input type="checkbox" id="ai_fast"> 快速模式（更快，深度略降）</label></div>
+      <div style="margin: 14px 0;"><button class="btn" id="ai_run" type="button">AI 分析这把 &gt;&gt;</button><label style="margin-left: 14px; font-size: 12px; color: var(--text-dim); cursor: pointer; user-select: none;"><input type="checkbox" id="ai_green"> 高亮增强（发两张图：原图抄字 + 增强图判亮暗）</label><label style="margin-left: 12px; font-size: 12px; color: var(--text-dim); cursor: pointer; user-select: none;"><input type="checkbox" id="ai_fast"> 快速模式（更快，深度略降）</label></div>
       <div class="pact-result" id="aiout"></div>
     </section>
 
@@ -305,6 +305,7 @@
     let aiModel = store.get(K_AIMODEL, "glm-4.5v");
     let aiGreen = true;
     let aiImage = null;
+    let aiImageGlow = null;
 
     const modelSel = document.getElementById("ai_model");
     const modelCustom = document.getElementById("ai_model_custom");
@@ -338,7 +339,8 @@
     function renderAiPick() {
       document.getElementById("aipick").innerHTML = `
         <label class="shot up" for="aifile">+ 选新图</label>
-        ${aiImage ? `<div class="shot sel"><img src="${aiImage}" alt="已选图片"><span class="selmark">已选 ✓</span></div>` : ""}
+        ${aiImage ? `<div class="shot"><img src="${aiImage}" alt="原始截图"><span class="selmark">原图</span></div>` : ""}
+        ${aiImageGlow ? `<div class="shot sel"><img src="${aiImageGlow}" alt="高亮增强图"><span class="selmark">增强 ✓</span></div>` : ""}
         ${shots.map((s, i) => `<div class="shot ${aiImage === s ? "sel" : ""}" data-ai="${i}"><img src="${s}" alt="可选截图${i + 1}"></div>`).join("")}
         ${shots.length === 0 && !aiImage ? `<div class="shot">还没有对局截图存档，点「+ 选新图」上传一张</div>` : ""}`;
     }
@@ -363,12 +365,12 @@
         img.src = URL.createObjectURL(file);
       });
     }
-    // 绿色增强版：保留绿色像素的彩色，其余灰度化——让 AI 一眼识别"哪些盟约可选"
-    function compressGreen(file) {
+    // 高亮增强版：亮起的盟约图标（亮薄荷绿圆底特征）保留彩色并提亮，未亮的压暗成深灰
+    function compressGlow(file) {
       return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
-          const scale = Math.min(1, 2560 / Math.max(img.width, img.height));
+          const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
           const c = document.createElement("canvas");
           c.width = Math.round(img.width * scale);
           c.height = Math.round(img.height * scale);
@@ -378,16 +380,21 @@
           const px = d.data;
           for (let i = 0; i < px.length; i += 4) {
             const r = px[i], g = px[i + 1], b = px[i + 2];
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
             const max = Math.max(r, g, b), min = Math.min(r, g, b);
             const sat = max === 0 ? 0 : (max - min) / max;
-            const isGreen = g === max && g > 60 && sat > 0.25 && g - Math.max(r, b) > 20;
-            if (!isGreen) {
-              const gray = Math.round(0.3 * r + 0.59 * g + 0.11 * b);
+            const lit = g === max && lum > 110 && sat > 0.35;
+            if (lit) {
+              px[i] = Math.min(255, Math.round(r * 1.2));
+              px[i + 1] = Math.min(255, Math.round(g * 1.2));
+              px[i + 2] = Math.min(255, Math.round(b * 1.2));
+            } else {
+              const gray = Math.round(lum * 0.35);
               px[i] = px[i + 1] = px[i + 2] = gray;
             }
           }
           ctx.putImageData(d, 0, 0);
-          resolve(c.toDataURL("image/jpeg", 0.92));
+          resolve(c.toDataURL("image/jpeg", 0.9));
         };
         img.onerror = reject;
         img.src = URL.createObjectURL(file);
@@ -395,7 +402,11 @@
     }
     document.getElementById("aifile").addEventListener("change", async e => {
       if (!e.target.files[0]) return;
-      try { aiImage = aiGreen ? await compressGreen(e.target.files[0]) : await compressHi(e.target.files[0]); renderAiPick(); }
+      try {
+        aiImage = await compressHi(e.target.files[0]);
+        aiImageGlow = aiGreen ? await compressGlow(e.target.files[0]) : null;
+        renderAiPick();
+      }
       catch { alert("这张图读不出来，换一张试试"); }
       e.target.value = "";
     });
@@ -416,8 +427,8 @@
         "【战术指令】：" + BANDS.map(x => "[" + x.type + "]" + trim(x.desc)).join("\n"),
         "【敌方领袖】：" + BOSSES.map(x => x.round + " 回合：" + x.name).join("\n"),
         (aiGreen
-          ? "请分析截图（已绿色增强处理：图中仍为彩色的部分=可选盟约，全部灰色的部分=不可选）。第一步抄录图中所有仍为彩色（绿色）的文字（盟约名，灰色文字是不可选的盟约不要抄）；第二步只从这些彩色盟约里推荐激活顺序并推荐干员（标注获取等阶），灰色盟约绝对不要出现在推荐里；给出玩法要点。简体中文分点，直接给结论。"
-          : "请分析截图（明日方舟卫戍协议界面）：第一步像抄写员一样逐字抄录截图中所有可见文字（尤其盟约名，不要解读归纳）；第二步判定每个盟约图标的颜色并严格分两组输出——『绿色=可选』和『非绿色=不可选』（不是绿色的就是不能选，被ban的盟约其干员也拿不到，拿不准的一律放非绿组）；第三步只从绿色组里推荐激活顺序并推荐干员（标注获取等阶），非绿色的盟约绝对不要出现在推荐里；给出玩法要点。简体中文分点，直接给结论。"),
+          ? "请分析截图（已绿色增强处理：图中仍为彩色的部分=可选盟约相关内容，全部灰色的部分=不可选或无关）。第一步抄录图中所有仍为彩色（绿色）的文字（盟约名）；第二步输出本局情报：敌方领袖是哪个、特训敌人类型、哪些盟约带角标（阵容不完整）；第三步给出盟约使用建议与干员获取优先级（标注获取等阶）。简体中文分点，直接给结论。"
+          : "请分析两张图（明日方舟卫戍协议『确认本局信息』界面）：第一张原图抄录全部盟约名并输出本局情报（敌方领袖、特训敌人、带『阵容不完整』角标的盟约）；第二张增强图判断哪些盟约图标是亮的（彩色发光=可选，压暗成灰=不可选）——核心盟约暗则其干员全不可用，附盟暗只ban专属干员；只对亮的盟约给激活建议与干员推荐（标注获取等阶）。简体中文分点，直接给结论。"),
       ].join("\n");
       const deepPrompt = [
         "你是《明日方舟》卫戍协议玩法的攻略助手。下面是当前版本（规程期）的两份数据：",
@@ -431,19 +442,15 @@
         BANDS.map(x => "[" + x.type + "] " + x.desc).join("\n"),
         "【敌方领袖】（领袖及各回合随从阵容）：",
         BOSSES.map(x => x.name + "：" + (x.appearances || []).map(a => "回合 " + a.round + "（随从：" + a.escorts.join("、") + "）").join("；")).join("\n"),
-        "【识别要求·抄字优先】截图是明日方舟卫戍协议的游戏界面。第一步请像抄写员一样，把截图中所有可见的中文文字逐字抄录成清单（尤其是盟约名称、干员名、数字），不要解读、不要归纳；第二步把抄录到的文字与上面的盟约数据逐条比对，列出『截图中出现的盟约』（每条注明：出现/未出现/不确定）；绝对不要凭空编造截图里没有的文字或盟约名。",
-        (aiGreen
-          ? "【图片已做绿色增强处理】上传的截图经过特殊处理：图中仍然保持彩色（绿色）的文字和图标=可选的盟约；所有变成灰色的部分（包括灰色文字）=不可选的盟约或无关内容。请只把图中保持绿色的盟约名视为可选，灰色的一律视为不可选，绝对不要推荐灰色的盟约。"
-          : "【颜色判定·最重要规则】截图里盟约名称/图标的颜色只有两种状态：显示为绿色=该盟约本局可以选择（可用）；不是绿色（灰色、白色、暗色等其他任何颜色）=该盟约不能选（被ban），且该盟约的所有干员都拿不到。请对识别到的每个盟约逐个判定颜色，严格标注【绿】或【非绿】，拿不准时也放入非绿组并标注（不确定）。"),
-        "【ban规则】被ban的效果分两类：核心盟约被ban——该核心盟约名下的所有干员都不可用（即使该干员还属于其他被选的附盟）；附盟被ban——只影响仅属于这一个盟约的干员，干员同时属于多个盟约时只要还有一个盟约没被ban就可用。",
-        "请分析用户上传的卫戍协议游戏截图：",
-        "1. 先输出你抄录到的全部文字清单；",
-        (aiGreen
-          ? "2. 输出盟约判定清单，严格分成两组：『彩色=可选』和『灰色=不可选』——图中保持彩色（绿色）的盟约才是可选的；"
-          : "2. 输出盟约颜色判定清单，严格分成两组：『绿色=可选』和『非绿色=不可选』——每组列出盟约名（拿不准的一律放入非绿组并标注不确定）；"),
-        "3. 后续推荐【只能】使用『绿色=可选』组里的盟约，结合盟约数据判断激活哪些最优（核心盟约被ban则其干员全部不可用；附盟被ban只ban专属干员——双盟约干员只要还有一个盟约没被ban就可用）；",
-        "4. 结合干员能力数据推荐干员（说明选谁、为什么，标注获取等阶；提醒高阶干员何时可得、前期用什么过渡）；",
-        "5. 给出这把的整体玩法要点。",
+        "【两张图说明】第一张是原始截图（用于抄录文字、识别领袖与特训敌人）；第二张是高亮增强版（亮起的盟约图标保留彩色并提亮、未亮的被压暗成深灰）——专门用于判断哪些盟约图标是亮的。",
+        "【亮暗判据·用第二张图】增强图中仍显示彩色/发光的盟约图标=本局可选；被压暗成深灰的图标=本局不可选（该盟约干员拿不到）。ban 规则：核心盟约未亮则其干员全部不可用（即使还属于其他亮的附盟）；附盟未亮只影响专属干员（双盟约干员只要还有一个所属盟约亮着就可用）。",
+        "请分析用户上传的卫戍协议游戏截图（两张图）：",
+        "1. 从第一张图抄录全部文字清单（26个盟约名都在界面上，逐个抄）；",
+        "2. 对照第二张增强图，输出亮暗判定清单，严格分两组：『亮的（可选）』和『暗的（不可选）』——列出盟约名；",
+        "3. 输出本局情报汇总：【敌方领袖】是哪个（与领袖库比对）、【特训敌人】是哪几类、【哪些盟约带『阵容不完整』角标】；",
+        "4. 只对『亮的（可选）』盟约给激活建议（ban 规则如上：核心被ban其干员全不可用，附盟被ban只ban专属干员）；",
+        "5. 结合干员能力数据推荐干员（标注获取等阶；针对敌方领袖与特训敌人给针对性建议）；",
+        "6. 给出这把的整体玩法要点。",
         "全部用简体中文分点回答，直接给结论。",
       ].join("\n");
       const prompt = aiFast ? fastPrompt : deepPrompt;
@@ -455,6 +462,7 @@
             model: aiModel,
             messages: [{ role: "user", content: [
               { type: "image_url", image_url: { url: aiImage } },
+              { type: "image_url", image_url: { url: aiImageGlow } },
               { type: "text", text: prompt },
             ] }],
             stream: true,
