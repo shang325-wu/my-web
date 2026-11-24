@@ -28,7 +28,7 @@
     <!-- ===== AI 截图分析（上传截图，AI 结合盟约库分析本局玩法） ===== -->
     <section id="ai">
       <div class="sec-title">AI 截图分析</div>
-      <div class="importbox">选一张本局截图（『确认本局信息』界面最佳）。AI 会识别：全部盟约池、带『阵容不完整』角标的盟约、敌方领袖、特训敌人类型，并结合干员获取等阶给出本局建议。API Key 只保存在你自己的浏览器里，不会被写进网页文件。</div>
+      <div class="importbox">选一张『确认本局信息』界面截图（16:9 全屏）。页面会先做像素级亮暗检测——程序按标定坐标采样每个盟约图标圆底的颜色，判定是否点亮（准确可靠，不依赖 AI 视觉）；检测结果作为 AI 推荐的依据。API Key 只保存在你自己的浏览器里，不会被写进网页文件。</div>
       <div class="addform">
         <input type="password" id="ai_key" placeholder="API Key（智谱）" size="24">
         <select id="ai_model" title="选择分析模型"></select>
@@ -400,11 +400,68 @@
         img.src = URL.createObjectURL(file);
       });
     }
+
+    // ---------- 盟约图标亮暗像素检测（基于『确认本局信息』界面相对坐标标定，基准 1600×717） ----------
+    // 适用：16:9 全屏确认界面截图；图标排列顺序与 PACTS 顺序一致（核心10 → 附盟行1 → 附盟行2）
+    const ICON_CAL = {
+      base: [1600, 717],
+      core: { y: 257, xs: [225, 315, 405, 495, 585, 675, 765, 855, 945, 1035] },
+      rows: [
+        { y: 463, xs: [225, 315, 405, 495, 585, 675, 765, 855, 945, 1035] },
+        { y: 622, xs: [225, 315, 405, 495, 585, 675] },
+      ],
+      dia: 72,
+    };
+    let aiDetect = null; // { lit: [亮起盟约名], dark: [未亮盟约名], reliable }
+
+    async function detectGarrisonIcons(dataURL) {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = dataURL; });
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      const px = ctx.getImageData(0, 0, c.width, c.height).data;
+      const W = c.width, H = c.height;
+      const sx = W / ICON_CAL.base[0], sy = H / ICON_CAL.base[1];
+      const at = (x, y) => { const i = (Math.max(0, Math.min(W - 1, Math.round(x))) + Math.max(0, Math.min(H - 1, Math.round(y))) * W) * 4; return [px[i], px[i + 1], px[i + 2]]; };
+      const positions = [];
+      for (let i = 0; i < 10; i++) positions.push({ idx: i, x: ICON_CAL.core.xs[i], y: ICON_CAL.core.y });
+      for (let i = 0; i < 10; i++) positions.push({ idx: 10 + i, x: ICON_CAL.rows[0].xs[i], y: ICON_CAL.rows[0].y });
+      for (let i = 0; i < 6; i++) positions.push({ idx: 20 + i, x: ICON_CAL.rows[1].xs[i], y: ICON_CAL.rows[1].y });
+      const lit = [], dark = [];
+      let reliability = 0;
+      for (const pos of positions) {
+        const cx = pos.x * sx, cy = pos.y * sy;
+        const rad = (ICON_CAL.dia / 2) * Math.min(sx, sy) * 0.85;
+        let teal = 0, total = 0;
+        for (let dy = -rad; dy <= rad; dy += 2) for (let dx = -rad; dx <= rad; dx += 2) {
+          if (dx * dx + dy * dy > rad * rad) continue;
+          const r0 = Math.max(0, Math.min(W - 1, Math.round(cx + dx)));
+          const y0 = Math.max(0, Math.min(H - 1, Math.round(cy + dy)));
+          const i2 = (r0 + y0 * W) * 4;
+          total++;
+          if (px[i2 + 1] > 170 && px[i2 + 2] > 150 && px[i2 + 1] > px[i2] * 1.6) teal++;
+        }
+        const litRatio = total ? teal / total : 0;
+        const isLit = litRatio > 0.35;
+        reliability += isLit ? litRatio : 1 - litRatio;
+        const entry = { name: PACTS[pos.idx].name, ratio: Math.round(litRatio * 100), lit: isLit };
+        (isLit ? lit : dark).push(entry);
+      }
+      return {
+        lit: lit.map(x => x.name),
+        dark: dark.map(x => x.name),
+        details: lit.concat(dark),
+        reliable: positions.length ? reliability / positions.length > 0.6 : false,
+      };
+    }
+
     document.getElementById("aifile").addEventListener("change", async e => {
       if (!e.target.files[0]) return;
       try {
         aiImage = await compressHi(e.target.files[0]);
         aiImageGlow = aiGreen ? await compressGlow(e.target.files[0]) : null;
+        try { aiDetect = await detectGarrisonIcons(aiImage); } catch { aiDetect = null; }
         renderAiPick();
       }
       catch { alert("这张图读不出来，换一张试试"); }
@@ -425,7 +482,9 @@
         "【盟约】：" + PACTS.map(p => p.name + "（激活需" + (p.count || 0) + "人）：" + p.effect).join("\n"),
         "【干员】（等阶=获取阶段：1-2前期商店可得，5-6要到高阶本）：" + OPS.map(o => o.name + "[" + o.bond + (o.golden ? "·精锐" : "") + "/等阶" + (o.level || "?") + "]：" + trim(o.ability)).join("\n"),
         "【战术指令】：" + BANDS.map(x => "[" + x.type + "]" + trim(x.desc)).join("\n"),
-        "【敌方领袖】：" + BOSSES.map(x => x.round + " 回合：" + x.name).join("\n"),
+        (aiDetect
+          ? "【像素检测·以此为准】亮起可用盟约：" + aiDetect.lit.join("、") + "；未亮不可用：" + aiDetect.dark.join("、") + "——只推荐亮起的盟约。"
+          : "【敌方领袖】：" + BOSSES.map(x => x.name + "（" + (x.appearances || []).map(a => "回合 " + a.round).join("/") + "）").join("；")),
         (aiGreen
           ? "请分析截图（已绿色增强处理：图中仍为彩色的部分=可选盟约相关内容，全部灰色的部分=不可选或无关）。第一步抄录图中所有仍为彩色（绿色）的文字（盟约名）；第二步输出本局情报：敌方领袖是哪个、特训敌人类型、哪些盟约带角标（阵容不完整）；第三步给出盟约使用建议与干员获取优先级（标注获取等阶）。简体中文分点，直接给结论。"
           : "请分析两张图（明日方舟卫戍协议『确认本局信息』界面）：第一张原图抄录全部盟约名并输出本局情报（敌方领袖、特训敌人、带『阵容不完整』角标的盟约）；第二张增强图判断哪些盟约图标是亮的（彩色发光=可选，压暗成灰=不可选）——核心盟约暗则其干员全不可用，附盟暗只ban专属干员；只对亮的盟约给激活建议与干员推荐（标注获取等阶）。简体中文分点，直接给结论。"),
@@ -442,6 +501,7 @@
         BANDS.map(x => "[" + x.type + "] " + x.desc).join("\n"),
         "【敌方领袖】（领袖及各回合随从阵容）：",
         BOSSES.map(x => x.name + "：" + (x.appearances || []).map(a => "回合 " + a.round + "（随从：" + a.escorts.join("、") + "）").join("；")).join("\n"),
+        (aiDetect ? "【像素级亮暗检测结果·以此为准，不要用视觉判断推翻】程序已对截图中每个盟约图标做颜色采样：亮起（可选）：" + aiDetect.lit.join("、") + "；未亮（不可用）：" + aiDetect.dark.join("、") + "。推荐只能基于亮起盟约：未亮的核心盟约其干员全部不可用，未亮的附盟只ban专属干员。" : "【亮暗检测未运行】请按截图实际亮暗状态判断盟约可用性：核心盟约未亮则其干员全部不可用；附盟未亮只ban专属干员（双盟约干员只要还有一个盟约没被ban就可用）。"),
         "【两张图说明】第一张是原始截图（用于抄录文字、识别领袖与特训敌人）；第二张是高亮增强版（亮起的盟约图标保留彩色并提亮、未亮的被压暗成深灰）——专门用于判断哪些盟约图标是亮的。",
         "【亮暗判据·用第二张图】增强图中仍显示彩色/发光的盟约图标=本局可选；被压暗成深灰的图标=本局不可选（该盟约干员拿不到）。ban 规则：核心盟约未亮则其干员全部不可用（即使还属于其他亮的附盟）；附盟未亮只影响专属干员（双盟约干员只要还有一个所属盟约亮着就可用）。",
         "请分析用户上传的卫戍协议游戏截图（两张图）：",
@@ -478,10 +538,12 @@
         const reader = res.body.getReader();
         const dec = new TextDecoder();
         let buf = "", full = "", reasoning = "";
-        box.innerHTML = `<div class="sec-title" id="ai_out_title"></div><div id="ai_think"></div><div class="ai-text" id="ai_ans"></div>`;
+        box.innerHTML = `<div class="sec-title" id="ai_out_title"></div><div class="pact-card" id="ai_detect_card"></div><div id="ai_think"></div><div class="ai-text" id="ai_ans"></div>`;
         const titleEl = document.getElementById("ai_out_title");
         const thinkEl = document.getElementById("ai_think");
         const ansEl = document.getElementById("ai_ans");
+        const detEl = document.getElementById("ai_detect_card");
+        if (aiDetect) detEl.innerHTML = `<span class="pn">像素检测·亮暗判定（以此为准）</span><div class="pe">亮起可用：${aiDetect.lit.join("、") || "无"}<br>未亮不可用：${aiDetect.dark.join("、") || "无"}<br>检测置信度：${Math.round((aiDetect.reliable || 0) * 100)}%</div>`;
         const follow = el => { if (el) el.scrollTop = el.scrollHeight; };
         let lastLen = 0, lastR = 0;
         while (true) {
