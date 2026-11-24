@@ -422,7 +422,7 @@
 
     function renderShots() {
       shotGrid.innerHTML = `
-        <div class="shot up" id="shotup">+ 上传截图</div>
+        <label class="shot up" for="shotfile">+ 上传截图</label>
         ${shots.map((s, i) => `
           <div class="shot"><img src="${s}" alt="截图${i + 1}">
             <button class="del" data-i="${i}" title="删除">✕</button>
@@ -432,7 +432,6 @@
     renderShots();
 
     shotGrid.addEventListener("click", e => {
-      if (e.target.id === "shotup") shotFile.click();
       const del = e.target.closest(".del");
       if (del && confirm("确定删除这张截图吗？")) {
         shots.splice(+del.dataset.i, 1);

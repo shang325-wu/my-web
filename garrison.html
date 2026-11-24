@@ -28,7 +28,7 @@
     <!-- ===== AI 截图分析（上传截图，AI 结合盟约库分析本局玩法） ===== -->
     <section id="ai">
       <div class="sec-title">AI 截图分析</div>
-      <div class="importbox">选一张本局截图（盟约选择/准备界面最佳），AI 会结合盟约库、干员能力、策略与战术指令分析这把怎么玩。API Key 只保存在你自己的浏览器里，不会被写进网页文件。</div>
+      <div class="importbox">选一张本局截图（盟约选择/准备界面最佳），AI 会结合盟约库、干员能力、装备、策略、战术指令与敌方领袖数据全面分析这把怎么玩。API Key 只保存在你自己的浏览器里，不会被写进网页文件。</div>
       <div class="addform">
         <input type="password" id="ai_key" placeholder="API Key（智谱）" size="24">
         <input type="text" id="ai_model" size="15" title="模型名，默认 glm-5v-turbo">
@@ -44,7 +44,7 @@
     <!-- ===== 战术情报（装备/策略/战术指令/敌人威胁，规程期游戏数据） ===== -->
     <section id="intel">
       <div class="sec-title">战术情报</div>
-      <div class="importbox">装备、策略、战术指令与敌人威胁分类，来自规程期游戏数据。领袖与战术特训敌人的具体资料暂无公开数据源，待收录。</div>
+      <div class="importbox">装备、策略、战术指令、敌人威胁分类与敌方领袖，来自规程期游戏数据。战术特训敌人的具体资料暂无公开数据源，待收录。</div>
       <input type="text" class="pact-search" id="isearch" placeholder="搜索装备/策略/战术指令...">
       <div id="intelbody"></div>
     </section>
@@ -241,7 +241,7 @@
 
     function renderShots() {
       shotGrid.innerHTML = `
-        <div class="shot up" id="shotup">+ 上传截图</div>
+        <label class="shot up" for="shotfile">+ 上传截图</label>
         ${shots.map((s, i) => `
           <div class="shot"><img src="${s}" alt="对局截图${i + 1}">
             <button class="del" data-i="${i}" title="删除">✕</button>
@@ -251,7 +251,6 @@
     renderShots();
 
     shotGrid.addEventListener("click", e => {
-      if (e.target.id === "shotup") shotFile.click();
       const del = e.target.closest(".del");
       if (del && confirm("确定删除这张截图吗？")) {
         shots.splice(+del.dataset.i, 1);
@@ -310,13 +309,12 @@
     // 选图：点选对局截图存档里的图，或上传新图（临时用，不进存档）
     function renderAiPick() {
       document.getElementById("aipick").innerHTML = `
-        <div class="shot up" id="aiup">+ 选新图</div>
+        <label class="shot up" for="aifile">+ 选新图</label>
         ${shots.map((s, i) => `<div class="shot ${aiImage === s ? "sel" : ""}" data-ai="${i}"><img src="${s}" alt="可选截图${i + 1}"></div>`).join("")}
         ${shots.length === 0 ? `<div class="shot">还没有对局截图存档，点「+ 选新图」上传一张</div>` : ""}`;
     }
     renderAiPick();
     document.getElementById("aipick").addEventListener("click", e => {
-      if (e.target.id === "aiup") { document.getElementById("aifile").click(); return; }
       const cell = e.target.closest("[data-ai]");
       if (cell) { aiImage = shots[+cell.dataset.ai]; renderAiPick(); }
     });
@@ -342,6 +340,8 @@
         STRATS.map(x => "[" + x.type + "] " + x.name + "：" + x.desc).join("\n"),
         "【战术指令】（开局可选战术）：",
         BANDS.map(x => "[" + x.type + "] " + x.desc).join("\n"),
+        "【敌方领袖】（各回合的敌方领袖与常见随从）：",
+        BOSSES.map(x => x.round + " 回合：" + x.name + (x.escorts.length ? "（随从：" + x.escorts.join("、") + "）" : "")).join("\n"),
         "请分析用户上传的卫戍协议游戏截图：",
         "1. 先识别截图内容：界面类型、出现的盟约/干员/资金/层数等关键信息；",
         "2. 结合盟约数据判断这把激活哪些核心/附加盟约最优，给出选择顺序和理由；",
@@ -382,7 +382,7 @@
       const box = document.getElementById("intelbody");
       const kw = intelKw.trim().toLowerCase();
       const f = arr => arr.filter(x => !kw || JSON.stringify(x).toLowerCase().includes(kw));
-      const eq = f(EQUIPS), st = f(STRATS), bd = f(BANDS), th = f(THREATS);
+      const eq = f(EQUIPS), st = f(STRATS), bd = f(BANDS), th = f(THREATS), bs = f(BOSSES);
       const open = kw ? " open" : "";
       const group = (title, items, inner) =>
         `<details class="intelgroup"${items.length && open ? " open" : ""}><summary>${title}（${items.length}）${kw && !items.length ? " — 无匹配" : ""}</summary><div class="igbody">${inner || '<div class="importbox">无匹配</div>'}</div></details>`;
@@ -395,6 +395,8 @@
           <div class="pact-card"><span class="pn">${t.type}</span><span class="pt">${t.enemies.length}名敌人（点击下方展开）</span></div>
           ${t.enemies.map(e => `
             <div class="pact-card"><img class="eicon" src="${e.img}" alt="" loading="lazy"><span class="pn">${e.name}</span><span class="pt">${e.level === "BOSS" ? "领袖" : e.level === "ELITE" ? "精英" : "普通"}${/_(2|3)$/.test(e.id) ? " · 强化版" : ""}</span><div class="pe">${e.desc}</div>${e.abilities ? `<div class="pp">${e.abilities}</div>` : ""}</div>`).join("")}`).join(""))
+        + group('敌方领袖', bs, bs.map(b => `
+          <div class="pact-card"><img class="eicon" src="${b.img}" alt="" loading="lazy"><span class="pn">${b.name}</span><span class="pt">回合 ${b.round}</span><div class="pe">${b.desc}</div>${b.abilities ? `<div class="pp">${b.abilities}</div>` : ""}${b.escorts.length ? `<div class="pp">常见随从：${b.escorts.join("、")}</div>` : ""}</div>`).join(""))
         + empty;
     }
     renderIntel();
