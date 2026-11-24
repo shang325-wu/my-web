@@ -807,6 +807,26 @@ section[id] { scroll-margin-top: 70px; }
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   background: var(--card);
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+/* ===== AI 思考过程（折叠） ===== */
+.think { margin-bottom: 10px; }
+.think summary {
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 12px;
+  letter-spacing: 1px;
+  user-select: none;
+}
+.think summary:hover { color: var(--accent); }
+.ai-reasoning {
+  color: var(--text-dim);
+  font-size: 12px;
+  border-left-color: var(--accent2);
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 /* ===== 干员能力列表（盟约卡内折叠） ===== */
@@ -841,6 +861,19 @@ section[id] { scroll-margin-top: 70px; }
   vertical-align: middle;
   float: left;
   background: var(--muted);
+}
+
+/* ===== AI 选图的选中标记 ===== */
+.shot .selmark {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  background: var(--accent);
+  color: #14160e;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 6px;
+  letter-spacing: 1px;
 }
 
 /* ===== 战术情报折叠分组 ===== */

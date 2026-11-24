@@ -28,16 +28,18 @@
     <!-- ===== AI 截图分析（上传截图，AI 结合盟约库分析本局玩法） ===== -->
     <section id="ai">
       <div class="sec-title">AI 截图分析</div>
-      <div class="importbox">选一张本局截图（盟约选择/准备界面最佳），AI 会结合盟约库、干员能力、装备、策略、战术指令与敌方领袖数据全面分析这把怎么玩。API Key 只保存在你自己的浏览器里，不会被写进网页文件。</div>
+      <div class="importbox">选一张本局截图（盟约选择/准备界面最佳，盟约栏完整清晰）。判定规则：截图里盟约显示为【绿色】才是可选的，不是绿色的都不能选。AI 会先输出绿色/非绿色两组识别清单，再只基于绿色盟约给出推荐。API Key 只保存在你自己的浏览器里，不会被写进网页文件。</div>
       <div class="addform">
         <input type="password" id="ai_key" placeholder="API Key（智谱）" size="24">
-        <input type="text" id="ai_model" size="15" title="模型名，默认 glm-5v-turbo">
+        <select id="ai_model" title="选择分析模型"></select>
+        <input type="text" id="ai_model_custom" placeholder="自定义模型名" size="12" style="display:none">
         <button class="btn ghost" id="ai_save" type="button">保存设置</button>
         <span id="ai_state"></span>
       </div>
       <div class="shots" id="aipick"></div>
       <input type="file" id="aifile" accept="image/*" hidden>
-      <div style="margin: 14px 0;"><button class="btn" id="ai_run" type="button">AI 分析这把 &gt;&gt;</button></div>
+
+      <div style="margin: 14px 0;"><button class="btn" id="ai_run" type="button">AI 分析这把 &gt;&gt;</button><label style="margin-left: 14px; font-size: 12px; color: var(--text-dim); cursor: pointer; user-select: none;"><input type="checkbox" id="ai_green"> 绿色增强（非绿部分变灰，突出可选盟约）</label><label style="margin-left: 12px; font-size: 12px; color: var(--text-dim); cursor: pointer; user-select: none;"><input type="checkbox" id="ai_fast"> 快速模式（更快，深度略降）</label></div>
       <div class="pact-result" id="aiout"></div>
     </section>
 
@@ -225,7 +227,7 @@
         ${extra.length ? `<div class="pact-card"><span class="pn">附加盟约</span><div class="pe">${extra.map(p => esc(p.name)).join("、")}</div></div>` : ""}
         ${alerts.map(a => `<div class="pact-card"><span class="pn">搭配提醒</span><div class="pe">${esc(a)}</div></div>`).join("")}
         <div class="pact-card"><span class="pn">搭配提示（参考）</span><div class="pe">${tips || "勾选盟约后这里显示各盟约的搭配建议"}</div></div>
-        <div class="pact-card"><span class="pn">推荐干员 TOP${rec.length}</span><div class="pe">${rec.map(o => `<div class="opline"><b>${esc(o.name)}${o.golden ? "(精锐)" : ""}</b> <span class="olv">等阶${o.level || "?"}</span>〔${esc(o.bond)}〕：${esc(o.ability)}</div>`).join("") || "先勾选盟约再看干员推荐"}</div></div>
+        <div class="pact-card"><span class="pn">推荐干员 TOP${rec.length}（按强度排序）</span><div class="pp">获取等阶说明：等阶 1-2 前期商店就能买到；等阶 5-6 要打到后期高阶本才出现——前期用低阶干员过渡，别死等高阶。</div><div class="pe">${rec.map(o => `<div class="opline"><b>${esc(o.name)}${o.golden ? "(精锐)" : ""}</b> <span class="olv">等阶${o.level || "?"}可获取</span>〔${esc(o.bond)}〕：${esc(o.ability)}</div>`).join("") || "先勾选盟约再看干员推荐"}</div></div>
         <div class="pact-card"><span class="pn">想深入？</span><div class="pe">把本局截图上传到上方「AI 分析」，AI 会结合本页全部数据给更贴合截图的建议。</div></div>`;
     }
     document.getElementById("pact_analyze").addEventListener("click", () => {
@@ -291,18 +293,44 @@
     });
 
     // ==================== AI 截图分析 ====================
-    const K_AIKEY = "garrison_aikey", K_AIMODEL = "garrison_aimodel";
+    const K_AIKEY = "garrison_aikey", K_AIMODEL = "garrison_aimodel", K_AIFAST = "garrison_fast", K_AIGREEN = "garrison_green";
+    const MODEL_PRESETS = [
+      { v: "glm-4.5v", label: "glm-4.5v（更强识别·推荐）" },
+      { v: "glm-5v-turbo", label: "glm-5v-turbo（快速·限时免费）" },
+      { v: "glm-4.6v-flash", label: "glm-4.6v-flash（免费·高峰限流）" },
+      { v: "glm-4.1v-thinking-flash", label: "glm-4.1v-thinking-flash（思考型）" },
+      { v: "glm-4v-flash", label: "glm-4v-flash（旧版免费）" },
+    ];
     let aiKey = store.get(K_AIKEY, "");
-    let aiModel = store.get(K_AIMODEL, "glm-5v-turbo");
+    let aiModel = store.get(K_AIMODEL, "glm-4.5v");
+    let aiGreen = true;
     let aiImage = null;
 
+    const modelSel = document.getElementById("ai_model");
+    const modelCustom = document.getElementById("ai_model_custom");
+    modelSel.innerHTML = MODEL_PRESETS.map(x => `<option value="${x.v}">${x.label}</option>`).join("") + `<option value="custom">自定义…</option>`;
+    function syncModelUI() {
+      const opt = MODEL_PRESETS.find(x => x.v === aiModel);
+      if (opt) { modelSel.value = opt.v; modelCustom.style.display = "none"; }
+      else { modelSel.value = "custom"; modelCustom.value = aiModel; modelCustom.style.display = ""; }
+    }
+    syncModelUI();
+    modelSel.addEventListener("change", () => { modelCustom.style.display = modelSel.value === "custom" ? "" : "none"; });
     document.getElementById("ai_key").value = aiKey;
-    document.getElementById("ai_model").value = aiModel;
+    let fastChk = document.getElementById("ai_fast");
+    fastChk.checked = store.get(K_AIFAST, false);
+    let greenChk = document.getElementById("ai_green");
+    greenChk.checked = store.get(K_AIGREEN, true);
+    aiGreen = greenChk.checked;
+    greenChk.addEventListener("change", () => { aiGreen = greenChk.checked; store.set(K_AIGREEN, aiGreen); });
     document.getElementById("ai_save").addEventListener("click", () => {
       aiKey = document.getElementById("ai_key").value.trim();
-      aiModel = document.getElementById("ai_model").value.trim() || "glm-5v-turbo";
+      aiModel = modelSel.value === "custom" ? modelCustom.value.trim() : modelSel.value;
+      if (!aiModel) aiModel = "glm-5v-turbo";
       store.set(K_AIKEY, aiKey);
       store.set(K_AIMODEL, aiModel);
+      aiFast = fastChk.checked;
+      store.set(K_AIFAST, aiFast);
       document.getElementById("ai_state").textContent = "已保存 ✓";
     });
 
@@ -310,17 +338,64 @@
     function renderAiPick() {
       document.getElementById("aipick").innerHTML = `
         <label class="shot up" for="aifile">+ 选新图</label>
+        ${aiImage ? `<div class="shot sel"><img src="${aiImage}" alt="已选图片"><span class="selmark">已选 ✓</span></div>` : ""}
         ${shots.map((s, i) => `<div class="shot ${aiImage === s ? "sel" : ""}" data-ai="${i}"><img src="${s}" alt="可选截图${i + 1}"></div>`).join("")}
-        ${shots.length === 0 ? `<div class="shot">还没有对局截图存档，点「+ 选新图」上传一张</div>` : ""}`;
+        ${shots.length === 0 && !aiImage ? `<div class="shot">还没有对局截图存档，点「+ 选新图」上传一张</div>` : ""}`;
     }
     renderAiPick();
     document.getElementById("aipick").addEventListener("click", e => {
       const cell = e.target.closest("[data-ai]");
       if (cell) { aiImage = shots[+cell.dataset.ai]; renderAiPick(); }
     });
+    // AI 分析专用：保持接近原始分辨率（长边 2560 内不缩放），文字保真度最大化
+    function compressHi(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, 2560 / Math.max(img.width, img.height));
+          const c = document.createElement("canvas");
+          c.width = Math.round(img.width * scale);
+          c.height = Math.round(img.height * scale);
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          resolve(c.toDataURL("image/jpeg", 0.92));
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+      });
+    }
+    // 绿色增强版：保留绿色像素的彩色，其余灰度化——让 AI 一眼识别"哪些盟约可选"
+    function compressGreen(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, 2560 / Math.max(img.width, img.height));
+          const c = document.createElement("canvas");
+          c.width = Math.round(img.width * scale);
+          c.height = Math.round(img.height * scale);
+          const ctx = c.getContext("2d");
+          ctx.drawImage(img, 0, 0, c.width, c.height);
+          const d = ctx.getImageData(0, 0, c.width, c.height);
+          const px = d.data;
+          for (let i = 0; i < px.length; i += 4) {
+            const r = px[i], g = px[i + 1], b = px[i + 2];
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            const sat = max === 0 ? 0 : (max - min) / max;
+            const isGreen = g === max && g > 60 && sat > 0.25 && g - Math.max(r, b) > 20;
+            if (!isGreen) {
+              const gray = Math.round(0.3 * r + 0.59 * g + 0.11 * b);
+              px[i] = px[i + 1] = px[i + 2] = gray;
+            }
+          }
+          ctx.putImageData(d, 0, 0);
+          resolve(c.toDataURL("image/jpeg", 0.92));
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+      });
+    }
     document.getElementById("aifile").addEventListener("change", async e => {
       if (!e.target.files[0]) return;
-      try { aiImage = await compress(e.target.files[0]); renderAiPick(); }
+      try { aiImage = aiGreen ? await compressGreen(e.target.files[0]) : await compressHi(e.target.files[0]); renderAiPick(); }
       catch { alert("这张图读不出来，换一张试试"); }
       e.target.value = "";
     });
@@ -329,26 +404,49 @@
       const esc = s => String(s).replace(/</g, "&lt;");
       if (!aiKey) { alert("请先填入并保存 API Key（open.bigmodel.cn 免费获取）"); return; }
       if (!aiImage) { alert("请先选一张截图：点选下面的对局截图，或上传新图"); return; }
-      document.getElementById("aiout").innerHTML = `<div class="importbox">AI 分析中，请稍候……（截图越清晰分析越准）</div>`;
-      const prompt = [
+      const t0 = Date.now();
+      const box = document.getElementById("aiout");
+      box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      box.innerHTML = `<div class="importbox">已发送请求（${esc(aiModel)}），等待模型返回……</div>`;
+      const trim = s3 => (s3.length > 60 ? s3.slice(0, 60) + "…" : s3);
+      const fastPrompt = [
+        "你是《明日方舟》卫戍协议玩法的攻略助手（快速模式，数据精简）：",
+        "【盟约】：" + PACTS.map(p => p.name + "（激活需" + (p.count || 0) + "人）：" + p.effect).join("\n"),
+        "【干员】（等阶=获取阶段：1-2前期商店可得，5-6要到高阶本）：" + OPS.map(o => o.name + "[" + o.bond + (o.golden ? "·精锐" : "") + "/等阶" + (o.level || "?") + "]：" + trim(o.ability)).join("\n"),
+        "【战术指令】：" + BANDS.map(x => "[" + x.type + "]" + trim(x.desc)).join("\n"),
+        "【敌方领袖】：" + BOSSES.map(x => x.round + " 回合：" + x.name).join("\n"),
+        (aiGreen
+          ? "请分析截图（已绿色增强处理：图中仍为彩色的部分=可选盟约，全部灰色的部分=不可选）。第一步抄录图中所有仍为彩色（绿色）的文字（盟约名，灰色文字是不可选的盟约不要抄）；第二步只从这些彩色盟约里推荐激活顺序并推荐干员（标注获取等阶），灰色盟约绝对不要出现在推荐里；给出玩法要点。简体中文分点，直接给结论。"
+          : "请分析截图（明日方舟卫戍协议界面）：第一步像抄写员一样逐字抄录截图中所有可见文字（尤其盟约名，不要解读归纳）；第二步判定每个盟约图标的颜色并严格分两组输出——『绿色=可选』和『非绿色=不可选』（不是绿色的就是不能选，被ban的盟约其干员也拿不到，拿不准的一律放非绿组）；第三步只从绿色组里推荐激活顺序并推荐干员（标注获取等阶），非绿色的盟约绝对不要出现在推荐里；给出玩法要点。简体中文分点，直接给结论。"),
+      ].join("\n");
+      const deepPrompt = [
         "你是《明日方舟》卫戍协议玩法的攻略助手。下面是当前版本（规程期）的两份数据：",
         "【盟约数据】（26条，JSON）：",
         JSON.stringify(PACTS),
-        "【干员能力数据】（每个干员的所属盟约、等阶、精锐状态与卫戍能力，JSON）：",
+        "【干员能力数据】（每个干员的所属盟约、获取等阶、精锐状态与卫戍能力，JSON）——获取等阶(level)表示该干员在调度中心升到几级后才会出现在商店：等阶1-2前期即可获取，等阶5-6要到后期高阶本：",
         JSON.stringify(OPS),
         "【策略】（休整期可选策略）：",
         STRATS.map(x => "[" + x.type + "] " + x.name + "：" + x.desc).join("\n"),
         "【战术指令】（开局可选战术）：",
         BANDS.map(x => "[" + x.type + "] " + x.desc).join("\n"),
-        "【敌方领袖】（各回合的敌方领袖与常见随从）：",
-        BOSSES.map(x => x.round + " 回合：" + x.name + (x.escorts.length ? "（随从：" + x.escorts.join("、") + "）" : "")).join("\n"),
+        "【敌方领袖】（领袖及各回合随从阵容）：",
+        BOSSES.map(x => x.name + "：" + (x.appearances || []).map(a => "回合 " + a.round + "（随从：" + a.escorts.join("、") + "）").join("；")).join("\n"),
+        "【识别要求·抄字优先】截图是明日方舟卫戍协议的游戏界面。第一步请像抄写员一样，把截图中所有可见的中文文字逐字抄录成清单（尤其是盟约名称、干员名、数字），不要解读、不要归纳；第二步把抄录到的文字与上面的盟约数据逐条比对，列出『截图中出现的盟约』（每条注明：出现/未出现/不确定）；绝对不要凭空编造截图里没有的文字或盟约名。",
+        (aiGreen
+          ? "【图片已做绿色增强处理】上传的截图经过特殊处理：图中仍然保持彩色（绿色）的文字和图标=可选的盟约；所有变成灰色的部分（包括灰色文字）=不可选的盟约或无关内容。请只把图中保持绿色的盟约名视为可选，灰色的一律视为不可选，绝对不要推荐灰色的盟约。"
+          : "【颜色判定·最重要规则】截图里盟约名称/图标的颜色只有两种状态：显示为绿色=该盟约本局可以选择（可用）；不是绿色（灰色、白色、暗色等其他任何颜色）=该盟约不能选（被ban），且该盟约的所有干员都拿不到。请对识别到的每个盟约逐个判定颜色，严格标注【绿】或【非绿】，拿不准时也放入非绿组并标注（不确定）。"),
+        "【ban规则】被ban的效果分两类：核心盟约被ban——该核心盟约名下的所有干员都不可用（即使该干员还属于其他被选的附盟）；附盟被ban——只影响仅属于这一个盟约的干员，干员同时属于多个盟约时只要还有一个盟约没被ban就可用。",
         "请分析用户上传的卫戍协议游戏截图：",
-        "1. 先识别截图内容：界面类型、出现的盟约/干员/资金/层数等关键信息；",
-        "2. 结合盟约数据判断这把激活哪些核心/附加盟约最优，给出选择顺序和理由；",
-        "3. 结合干员能力数据推荐本局应重点获取和使用的干员（说明选谁、为什么）；",
-        "4. 给出这把的整体玩法要点。",
+        "1. 先输出你抄录到的全部文字清单；",
+        (aiGreen
+          ? "2. 输出盟约判定清单，严格分成两组：『彩色=可选』和『灰色=不可选』——图中保持彩色（绿色）的盟约才是可选的；"
+          : "2. 输出盟约颜色判定清单，严格分成两组：『绿色=可选』和『非绿色=不可选』——每组列出盟约名（拿不准的一律放入非绿组并标注不确定）；"),
+        "3. 后续推荐【只能】使用『绿色=可选』组里的盟约，结合盟约数据判断激活哪些最优（核心盟约被ban则其干员全部不可用；附盟被ban只ban专属干员——双盟约干员只要还有一个盟约没被ban就可用）；",
+        "4. 结合干员能力数据推荐干员（说明选谁、为什么，标注获取等阶；提醒高阶干员何时可得、前期用什么过渡）；",
+        "5. 给出这把的整体玩法要点。",
         "全部用简体中文分点回答，直接给结论。",
       ].join("\n");
+      const prompt = aiFast ? fastPrompt : deepPrompt;
       try {
         const res = await fetch("https://open.bigmodel.cn/api/paas/v4/chat/completions", {
           method: "POST",
@@ -359,20 +457,62 @@
               { type: "image_url", image_url: { url: aiImage } },
               { type: "text", text: prompt },
             ] }],
+            stream: true,
           }),
         });
-        const j = await res.json();
-        if (j.error) {
-          document.getElementById("aiout").innerHTML =
-            `<div class="importbox">调用失败：${esc(j.error.message || JSON.stringify(j.error))}<br>若提示「访问量过大」是免费模型高峰期限流，稍等再点一次，或在设置里换模型名。</div>`;
-        } else {
-          const text = j.choices?.[0]?.message?.content || "(模型没有返回内容)";
-          document.getElementById("aiout").innerHTML =
-            `<div class="sec-title">分析结果</div><div class="ai-text">${esc(text).replace(/\n/g, "<br>")}</div>`;
+        if (!res.ok) {
+          const j = await res.json().catch(() => null);
+          const msg = j && j.error ? (j.error.message || JSON.stringify(j.error)) : "HTTP " + res.status;
+          box.innerHTML = `<div class="importbox">调用失败：${esc(msg)}<br>若提示「访问量过大」是免费模型高峰期限流，稍等再点一次，或在设置里换模型名。</div>`;
+          return;
         }
+        // 流式读取：固定 DOM 结构只更新文本（容器不重建，滚动位置保留），自动跟随最新
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "", full = "", reasoning = "";
+        box.innerHTML = `<div class="sec-title" id="ai_out_title"></div><div id="ai_think"></div><div class="ai-text" id="ai_ans"></div>`;
+        const titleEl = document.getElementById("ai_out_title");
+        const thinkEl = document.getElementById("ai_think");
+        const ansEl = document.getElementById("ai_ans");
+        const follow = el => { if (el) el.scrollTop = el.scrollHeight; };
+        let lastLen = 0, lastR = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop();
+          for (const line of lines) {
+            const t2 = line.trim();
+            if (!t2.startsWith("data:")) continue;
+            const payload = t2.slice(5).trim();
+            if (payload === "[DONE]") continue;
+            try {
+              const jj = JSON.parse(payload);
+              const d = jj.choices?.[0]?.delta || {};
+              if (d.reasoning_content) reasoning += d.reasoning_content;
+              if (d.content) full += d.content;
+            } catch { }
+          }
+          // 有新增内容才更新 DOM（减少重排），更新后自动滚到底
+          if (reasoning.length !== lastR) {
+            lastR = reasoning.length;
+            thinkEl.innerHTML = `<details class="think" open><summary>AI 思考过程（${reasoning.length} 字）</summary><div class="ai-text ai-reasoning">${esc(reasoning)}</div></details>`;
+            follow(thinkEl.querySelector(".ai-reasoning"));
+          }
+          if (full.length !== lastLen) {
+            lastLen = full.length;
+            ansEl.textContent = full;
+            follow(ansEl);
+          }
+          titleEl.textContent = `分析结果（生成中……${aiFast ? "快速模式" : "深度模式"}）`;
+        }
+        titleEl.textContent = `分析结果（用时 ${Math.round((Date.now() - t0) / 1000)} 秒 · ${aiModel}${aiFast ? " · 快速模式" : " · 深度模式"}）`;
+        thinkEl.innerHTML = reasoning ? `<details class="think"><summary>AI 思考过程（${reasoning.length} 字）· 已折叠</summary><div class="ai-text ai-reasoning">${esc(reasoning)}</div></details>` : "";
+        ansEl.textContent = full || "(无内容)";
+        if (!full && !reasoning) box.innerHTML = `<div class="importbox">模型没有返回内容，稍后再试或在设置里换模型名。</div>`;
       } catch (err) {
-        document.getElementById("aiout").innerHTML =
-          `<div class="importbox">请求失败：${esc(err)}<br>若是跨域(CORS)类报错，把这段提示发给 AI 助手来处理。</div>`;
+        box.innerHTML = `<div class="importbox">请求失败：${esc(err)}<br>若是跨域(CORS)类报错，把这段提示发给 AI 助手来处理。</div>`;
       }
     });
 
@@ -392,11 +532,12 @@
         + group('策略', st, st.map(x => `<div class="pact-card"><span class="pn">${x.name}</span><span class="pt">${x.type}</span><div class="pe">${x.desc}</div></div>`).join(""))
         + group('战术指令', bd, bd.map(x => `<div class="pact-card"><span class="pt">${x.type}</span><div class="pe">${x.desc}</div></div>`).join(""))
         + group('敌人威胁分类', th, th.map(t => `
-          <div class="pact-card"><span class="pn">${t.type}</span><span class="pt">${t.enemies.length}名敌人（点击下方展开）</span></div>
+          <details class="think"${kw ? " open" : ""}><summary>${t.type} · ${t.enemies.length}名敌人</summary><div class="igbody">
           ${t.enemies.map(e => `
-            <div class="pact-card"><img class="eicon" src="${e.img}" alt="" loading="lazy"><span class="pn">${e.name}</span><span class="pt">${e.level === "BOSS" ? "领袖" : e.level === "ELITE" ? "精英" : "普通"}${/_(2|3)$/.test(e.id) ? " · 强化版" : ""}</span><div class="pe">${e.desc}</div>${e.abilities ? `<div class="pp">${e.abilities}</div>` : ""}</div>`).join("")}`).join(""))
+            <div class="pact-card"><img class="eicon" src="${e.img}" alt="" loading="lazy"><span class="pn">${e.name}</span><span class="pt">${e.level === "BOSS" ? "领袖" : e.level === "ELITE" ? "精英" : "普通"}${/_(2|3)$/.test(e.id) ? " · 强化版" : ""}</span><div class="pe">${e.desc}</div>${e.abilities ? `<div class="pp">${e.abilities}</div>` : ""}</div>`).join("")}
+          </div></details>`).join(""))
         + group('敌方领袖', bs, bs.map(b => `
-          <div class="pact-card"><img class="eicon" src="${b.img}" alt="" loading="lazy"><span class="pn">${b.name}</span><span class="pt">回合 ${b.round}</span><div class="pe">${b.desc}</div>${b.abilities ? `<div class="pp">${b.abilities}</div>` : ""}${b.escorts.length ? `<div class="pp">常见随从：${b.escorts.join("、")}</div>` : ""}</div>`).join(""))
+          <div class="pact-card"><img class="eicon" src="${b.img}" alt="" loading="lazy"><span class="pn">${b.name}</span><span class="pt">${(b.appearances || []).length}次出场</span><div class="pe">${b.desc}</div>${b.abilities ? `<div class="pp">${b.abilities}</div>` : ""}${(b.appearances || []).map(a => `<div class="opline"><b>回合 ${a.round}</b>：随从——${a.escorts.join("、")}</div>`).join("")}</div>`).join(""))
         + empty;
     }
     renderIntel();
