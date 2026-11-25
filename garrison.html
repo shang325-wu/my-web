@@ -443,8 +443,9 @@
           if (px[i2 + 1] > 170 && px[i2 + 2] > 150 && px[i2 + 1] > px[i2] * 1.6) teal++;
         }
         const litRatio = total ? teal / total : 0;
-        const isLit = litRatio > 0.35;
-        reliability += isLit ? litRatio : 1 - litRatio;
+        // 判据（真实截图实测）：亮起图标圆内青绿占比约 9%~37%，未亮图标严格为 0%——5% 阈值安全
+        const isLit = litRatio > 0.05;
+        reliability += (litRatio < 0.02 || litRatio > 0.05) ? 1 : 0.5;
         const entry = { name: PACTS[pos.idx].name, ratio: Math.round(litRatio * 100), lit: isLit };
         (isLit ? lit : dark).push(entry);
       }
