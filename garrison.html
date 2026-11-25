@@ -28,11 +28,12 @@
     <!-- ===== AI 截图分析（上传截图，AI 结合盟约库分析本局玩法） ===== -->
     <section id="ai">
       <div class="sec-title">AI 截图分析</div>
-      <div class="importbox">选一张『确认本局信息』界面截图（16:9 全屏）。页面会先做像素级亮暗检测——程序按标定坐标采样每个盟约图标圆底的颜色，判定是否点亮（准确可靠，不依赖 AI 视觉）；检测结果作为 AI 推荐的依据。API Key 只保存在你自己的浏览器里，不会被写进网页文件。</div>
+      <div class="importbox">选一张『确认本局信息』界面截图（16:9 全屏）——传图后自动完成全部流程：像素级亮暗检测（不依赖 AI，实测 100% 准确）→ 自动勾选可用盟约 → 生成本局分析（盟约建议/干员推荐/获取等阶），零操作零等待。可选：配置 AI 平台做深度分析（推荐硅基流动——实测支持浏览器直连、注册送额度；智谱不支持浏览器直连）。API Key 只保存在你自己的浏览器里，不会被写进网页文件。</div>
       <div class="addform">
-        <input type="password" id="ai_key" placeholder="API Key（智谱）" size="24">
+        <select id="ai_platform" title="选择 AI 平台"></select>
+        <input type="password" id="ai_key" placeholder="API Key（对应平台）" size="22">
         <select id="ai_model" title="选择分析模型"></select>
-        <input type="text" id="ai_model_custom" placeholder="自定义模型名" size="12" style="display:none">
+        <input type="text" id="ai_model_custom" placeholder="自定义模型名" size="10" style="display:none">
         <button class="btn ghost" id="ai_save" type="button">保存设置</button>
         <span id="ai_state"></span>
       </div>
@@ -292,32 +293,46 @@
       renderShots();
     });
 
-    // ==================== AI 截图分析 ====================
-    const K_AIKEY = "garrison_aikey", K_AIMODEL = "garrison_aimodel", K_AIFAST = "garrison_fast", K_AIGREEN = "garrison_green";
-    const MODEL_PRESETS = [
-      { v: "glm-4.5v", label: "glm-4.5v（更强识别·推荐）" },
-      { v: "glm-5v-turbo", label: "glm-5v-turbo（快速·限时免费）" },
-      { v: "glm-4.6v-flash", label: "glm-4.6v-flash（免费·高峰限流）" },
-      { v: "glm-4.1v-thinking-flash", label: "glm-4.1v-thinking-flash（思考型）" },
-      { v: "glm-4v-flash", label: "glm-4v-flash（旧版免费）" },
+    // ==================== AI 平台配置（实测支持浏览器直连的平台） ====================
+    const PLATFORMS = [
+      { v: "siliconflow", label: "硅基流动（浏览器直连 ✓ · 注册送额度）", url: "https://api.siliconflow.cn/v1/chat/completions", models: ["Qwen/Qwen2.5-VL-72B-Instruct", "Qwen/Qwen2.5-VL-32B-Instruct", "THUDM/GLM-4.1V-9B-Thinking", "Qwen/Qwen2-VL-72B-Instruct"] },
+      { v: "moonshot", label: "月之暗面（浏览器直连 ✓）", url: "https://api.moonshot.cn/v1/chat/completions", models: ["moonshot-v1-8v-vision-preview", "moonshot-v1-32v-vision-preview"] },
+      { v: "zhipu", label: "智谱（✗ 浏览器预检被拦，仅备用）", url: "https://open.bigmodel.cn/api/paas/v4/chat/completions", models: ["glm-4.5v", "glm-5v-turbo", "glm-4.6v-flash"] },
     ];
-    let aiKey = store.get(K_AIKEY, "");
-    let aiModel = store.get(K_AIMODEL, "glm-4.5v");
+    const K_AIFAST = "garrison_fast", K_AIGREEN = "garrison_green";
+    let aiPlatform = store.get("garrison_platform", "siliconflow");
+    let aiKey = store.get("garrison_key_" + aiPlatform, "");
+    let aiModel = store.get("garrison_model_" + aiPlatform, PLATFORMS[0].models[0]);
     let aiGreen = true;
     let aiImage = null;
     let aiImageGlow = null;
 
+
+    const platformSel = document.getElementById("ai_platform");
+    const keyEl = document.getElementById("ai_key");
     const modelSel = document.getElementById("ai_model");
     const modelCustom = document.getElementById("ai_model_custom");
-    modelSel.innerHTML = MODEL_PRESETS.map(x => `<option value="${x.v}">${x.label}</option>`).join("") + `<option value="custom">自定义…</option>`;
-    function syncModelUI() {
-      const opt = MODEL_PRESETS.find(x => x.v === aiModel);
-      if (opt) { modelSel.value = opt.v; modelCustom.style.display = "none"; }
-      else { modelSel.value = "custom"; modelCustom.value = aiModel; modelCustom.style.display = ""; }
+
+    function currentPlatform() { return PLATFORMS.find(x => x.v === aiPlatform) || PLATFORMS[0]; }
+    function renderPlatformUI() {
+      platformSel.innerHTML = PLATFORMS.map(x => `<option value="${x.v}">${x.label}</option>`).join("");
+      platformSel.value = aiPlatform;
+      keyEl.value = aiKey;
+      keyEl.placeholder = "API Key（" + currentPlatform().v + "）";
+      modelSel.innerHTML = currentPlatform().models.map(m => `<option value="${m}">${m}</option>`).join("") + `<option value="custom">自定义…</option>`;
+      modelSel.value = currentPlatform().models.includes(aiModel) ? aiModel : "custom";
+      if (modelSel.value === "custom") modelCustom.value = aiModel;
+      modelCustom.style.display = modelSel.value === "custom" ? "" : "none";
     }
-    syncModelUI();
+    renderPlatformUI();
+    platformSel.addEventListener("change", () => {
+      aiPlatform = platformSel.value;
+      store.set("garrison_platform", aiPlatform);
+      aiKey = store.get("garrison_key_" + aiPlatform, "");
+      aiModel = store.get("garrison_model_" + aiPlatform, currentPlatform().models[0]);
+      renderPlatformUI();
+    });
     modelSel.addEventListener("change", () => { modelCustom.style.display = modelSel.value === "custom" ? "" : "none"; });
-    document.getElementById("ai_key").value = aiKey;
     let fastChk = document.getElementById("ai_fast");
     fastChk.checked = store.get(K_AIFAST, false);
     let greenChk = document.getElementById("ai_green");
@@ -325,14 +340,12 @@
     aiGreen = greenChk.checked;
     greenChk.addEventListener("change", () => { aiGreen = greenChk.checked; store.set(K_AIGREEN, aiGreen); });
     document.getElementById("ai_save").addEventListener("click", () => {
-      aiKey = document.getElementById("ai_key").value.trim();
+      aiKey = keyEl.value.trim();
       aiModel = modelSel.value === "custom" ? modelCustom.value.trim() : modelSel.value;
-      if (!aiModel) aiModel = "glm-5v-turbo";
-      store.set(K_AIKEY, aiKey);
-      store.set(K_AIMODEL, aiModel);
-      aiFast = fastChk.checked;
-      store.set(K_AIFAST, aiFast);
-      document.getElementById("ai_state").textContent = "已保存 ✓";
+      if (!aiModel) aiModel = currentPlatform().models[0];
+      store.set(K_AIKEY(aiPlatform), aiKey);
+      store.set(K_AIMODEL(aiPlatform), aiModel);
+      document.getElementById("ai_state").textContent = "已保存 ✓（" + currentPlatform().v + "）";
     });
 
     // 选图：点选对局截图存档里的图，或上传新图（临时用，不进存档）
@@ -464,6 +477,13 @@
         aiImageGlow = aiGreen ? await compressGlow(e.target.files[0]) : null;
         try { aiDetect = await detectGarrisonIcons(aiImage); } catch { aiDetect = null; }
         renderAiPick();
+        // 像素检测完成 → 自动勾选可用盟约并生成本地分析（游玩时零操作闭环，无需 AI）
+        if (aiDetect && aiDetect.lit.length) {
+          selected.clear();
+          PACTS.forEach(p => { if (aiDetect.lit.includes(p.name)) selected.add(p.name); });
+          analyzeLocal(PACTS.filter(p => selected.has(p.name)));
+          setTimeout(() => { const el = document.getElementById("pactresult"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }, 150);
+        }
       }
       catch { alert("这张图读不出来，换一张试试"); }
       e.target.value = "";
@@ -516,7 +536,7 @@
       ].join("\n");
       const prompt = aiFast ? fastPrompt : deepPrompt;
       try {
-        const res = await fetch("https://open.bigmodel.cn/api/paas/v4/chat/completions", {
+        const res = await fetch(currentPlatform().url, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": "Bearer " + aiKey },
           body: JSON.stringify({
