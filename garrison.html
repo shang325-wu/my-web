@@ -94,6 +94,7 @@
       <button class="btn ghost" id="imp_btn" type="button">导入备份</button>
       <button class="btn ghost" id="clr_btn" type="button">清空录入</button>
       <input type="file" id="imp_file" accept=".json" hidden>
+      <span id="db_state"></span>
     </div>
 
     <footer>卫戍协议 · 明日方舟玩法专区</footer>
@@ -233,7 +234,7 @@
     }
     document.getElementById("pact_analyze").addEventListener("click", () => {
       const picked = PACTS.filter(p => selected.has(p.name));
-      if (!picked.length) { alert("先勾选本局出现的盟约，再点分析本局"); return; }
+      if (!picked.length) { document.getElementById("pactresult").innerHTML = `<div class="importbox">先勾选本局出现的盟约（点上方盟约图标），再点分析本局</div>`; return; }
       analyzeLocal(picked);
     });
 
@@ -281,12 +282,12 @@
     shotFile.addEventListener("change", async () => {
       for (const f of shotFile.files) {
         try { shots.push(await compress(f)); }
-        catch { alert("这张图读不出来，换一张试试"); }
+        catch { document.getElementById("aiout").innerHTML = `<div class="importbox">⚠ 有图片读不出来，已跳过该张。</div>`; }
       }
       try {
         store.set(K_SHOTS, shots);
       } catch {
-        alert("浏览器存储快满了，删几张旧截图再传");
+        document.getElementById("aiout").innerHTML = `<div class="importbox">⚠ 浏览器存储快满了——删几张旧截图再传，或先在下方「数据管理」导出备份。</div>`;
         shots = store.get(K_SHOTS, []);
       }
       shotFile.value = "";
@@ -295,10 +296,11 @@
 
     // ==================== AI 平台配置（实测支持浏览器直连的平台） ====================
     const PLATFORMS = [
-      { v: "siliconflow", label: "硅基流动（浏览器直连 ✓ · 注册送额度）", url: "https://api.siliconflow.cn/v1/chat/completions", models: ["Qwen/Qwen2.5-VL-72B-Instruct", "Qwen/Qwen2.5-VL-32B-Instruct", "THUDM/GLM-4.1V-9B-Thinking", "Qwen/Qwen2-VL-72B-Instruct"] },
+      { v: "siliconflow", label: "硅基流动（浏览器直连 ✓ · 注册送额度）", url: "https://api.siliconflow.cn/v1/chat/completions", models: ["Pro/Qwen/Qwen2.5-VL-7B-Instruct", "THUDM/GLM-4.1V-9B-Thinking", "Qwen/Qwen2.5-VL-72B-Instruct", "Qwen/Qwen2-VL-72B-Instruct"] },
       { v: "moonshot", label: "月之暗面（浏览器直连 ✓）", url: "https://api.moonshot.cn/v1/chat/completions", models: ["moonshot-v1-8v-vision-preview", "moonshot-v1-32v-vision-preview"] },
       { v: "zhipu", label: "智谱（✗ 浏览器预检被拦，仅备用）", url: "https://open.bigmodel.cn/api/paas/v4/chat/completions", models: ["glm-4.5v", "glm-5v-turbo", "glm-4.6v-flash"] },
     ];
+    const K_AIKEY = p => "garrison_key_" + p, K_AIMODEL = p => "garrison_model_" + p;
     const K_AIFAST = "garrison_fast", K_AIGREEN = "garrison_green";
     let aiPlatform = store.get("garrison_platform", "siliconflow");
     let aiKey = store.get("garrison_key_" + aiPlatform, "");
@@ -334,7 +336,7 @@
     });
     modelSel.addEventListener("change", () => { modelCustom.style.display = modelSel.value === "custom" ? "" : "none"; });
     let fastChk = document.getElementById("ai_fast");
-    fastChk.checked = store.get(K_AIFAST, false);
+    fastChk.checked = store.get(K_AIFAST, true); // 默认快速模式（游玩时先出结果），需要深度分析再取消勾选
     let greenChk = document.getElementById("ai_green");
     greenChk.checked = store.get(K_AIGREEN, true);
     aiGreen = greenChk.checked;
@@ -471,6 +473,7 @@
     }
 
     document.getElementById("aifile").addEventListener("change", async e => {
+      const aibox = document.getElementById("aiout");
       if (!e.target.files[0]) return;
       try {
         aiImage = await compressHi(e.target.files[0]);
@@ -485,18 +488,18 @@
           setTimeout(() => { const el = document.getElementById("pactresult"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }, 150);
         }
       }
-      catch { alert("这张图读不出来，换一张试试"); }
+      catch { aibox.innerHTML = `<div class="importbox">⚠ 这张图读不出来，换一张试试。</div>`; }
       e.target.value = "";
     });
 
     document.getElementById("ai_run").addEventListener("click", async () => {
       const esc = s => String(s).replace(/</g, "&lt;");
-      if (!aiKey) { alert("请先填入并保存 API Key（open.bigmodel.cn 免费获取）"); return; }
-      if (!aiImage) { alert("请先选一张截图：点选下面的对局截图，或上传新图"); return; }
+      if (!aiKey) { box.innerHTML = `<div class="importbox">⚠ 尚未配置 AI 平台的 API Key——请在上方填入并保存（免费注册：siliconflow.cn，注册送额度）。<br>不需要 AI 也可以：基于像素检测的「本局综合分析」已在上方「盟约查询器」板块即时生成（零等待零费用）。</div>`; return; }
+      if (!aiImage) { box.innerHTML = `<div class="importbox">请先选一张截图：点「+ 选新图」上传，或点选下方对局截图存档。</div>`; return; }
       const t0 = Date.now();
       const box = document.getElementById("aiout");
       box.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      box.innerHTML = `<div class="importbox">已发送请求（${esc(aiModel)}），等待模型返回……</div>`;
+      box.innerHTML = `<div class="importbox">已发送请求（${esc(aiModel)}${aiFast ? " · 快速模式" : " · 深度模式"}）。${aiFast ? "通常 10-30 秒出结果" : "深度模式输入量大，约需 1-3 分钟，请耐心等待"}。<br>提示：基于像素检测的「本局综合分析」已在上方「盟约查询器」板块即时生成（零等待），AI 深度解读稍后补上。</div>`;
       const trim = s3 => (s3.length > 60 ? s3.slice(0, 60) + "…" : s3);
       const fastPrompt = [
         "你是《明日方舟》卫戍协议玩法的攻略助手（快速模式，数据精简）：",
@@ -512,10 +515,10 @@
       ].join("\n");
       const deepPrompt = [
         "你是《明日方舟》卫戍协议玩法的攻略助手。下面是当前版本（规程期）的两份数据：",
-        "【盟约数据】（26条，JSON）：",
-        JSON.stringify(PACTS),
-        "【干员能力数据】（每个干员的所属盟约、获取等阶、精锐状态与卫戍能力，JSON）——获取等阶(level)表示该干员在调度中心升到几级后才会出现在商店：等阶1-2前期即可获取，等阶5-6要到后期高阶本：",
-        JSON.stringify(OPS),
+        "【盟约数据】26条，每行格式：名称｜类型｜效果（<在场N名>是6人高级效果的触发条件）：",
+        PACTS.map(p => p.name + "｜" + p.type + "｜" + p.effect).join("\n"),
+        "【干员能力数据】每行格式：干员名｜所属盟约｜获取等阶(1-6,数值越高越要到后期高阶本商店才出现)｜精锐(1/0)｜卫戍能力：",
+        OPS.map(o => o.name + "｜" + o.bond + "｜" + (o.level || "?") + "｜" + (o.golden ? 1 : 0) + "｜" + o.ability).join("\n"),
         "【策略】（休整期可选策略）：",
         STRATS.map(x => "[" + x.type + "] " + x.name + "：" + x.desc).join("\n"),
         "【战术指令】（开局可选战术）：",
@@ -558,7 +561,7 @@
         // 流式读取：固定 DOM 结构只更新文本（容器不重建，滚动位置保留），自动跟随最新
         const reader = res.body.getReader();
         const dec = new TextDecoder();
-        let buf = "", full = "", reasoning = "";
+        let buf = "", full = "", reasoning = "", chunkCount = 0;
         box.innerHTML = `<div class="sec-title" id="ai_out_title"></div><div class="pact-card" id="ai_detect_card"></div><div id="ai_think"></div><div class="ai-text" id="ai_ans"></div>`;
         const titleEl = document.getElementById("ai_out_title");
         const thinkEl = document.getElementById("ai_think");
@@ -582,7 +585,7 @@
               const jj = JSON.parse(payload);
               const d = jj.choices?.[0]?.delta || {};
               if (d.reasoning_content) reasoning += d.reasoning_content;
-              if (d.content) full += d.content;
+              if (d.content) { full += d.content; chunkCount++; }
             } catch { }
           }
           // 有新增内容才更新 DOM（减少重排），更新后自动滚到底
@@ -597,6 +600,20 @@
             follow(ansEl);
           }
           titleEl.textContent = `分析结果（生成中……${aiFast ? "快速模式" : "深度模式"}）`;
+        }
+        // 打字机兜底：若网络缓冲导致内容一次性到达（有内容的更新次数过少），用逐字动画补足流式观感
+        if (chunkCount < 5 && full.length > 120) {
+          thinkEl.innerHTML = reasoning ? `<details class="think"><summary>AI 思考过程（${reasoning.length} 字）· 已折叠</summary><div class="ai-text ai-reasoning">${esc(reasoning)}</div></details>` : "";
+          titleEl.textContent = `分析结果（用时 ${Math.round((Date.now() - t0) / 1000)} 秒 · ${aiModel}${aiFast ? " · 快速模式" : " · 深度模式"}）`;
+          let i = 0;
+          const step = Math.max(2, Math.ceil(full.length / 150));
+          const tw = setInterval(() => {
+            i = Math.min(full.length, i + step);
+            ansEl.textContent = full.slice(0, i);
+            follow(ansEl);
+            if (i >= full.length) clearInterval(tw);
+          }, 24);
+          return;
         }
         titleEl.textContent = `分析结果（用时 ${Math.round((Date.now() - t0) / 1000)} 秒 · ${aiModel}${aiFast ? " · 快速模式" : " · 深度模式"}）`;
         thinkEl.innerHTML = reasoning ? `<details class="think"><summary>AI 思考过程（${reasoning.length} 字）· 已折叠</summary><div class="ai-text ai-reasoning">${esc(reasoning)}</div></details>` : "";
@@ -707,8 +724,8 @@
           if (Array.isArray(data.shots)) { shots = data.shots; store.set(K_SHOTS, shots); }
           renderLogs();
           renderShots();
-          alert("备份已恢复");
-        } catch { alert("备份文件格式不对，选导出时下载的那个 json"); }
+          document.getElementById("db_state").textContent = "备份已恢复 ✓";
+        } catch { document.getElementById("db_state").textContent = "备份文件格式不对——选导出时下载的那个 json"; }
       };
       fr.readAsText(e.target.files[0]);
       e.target.value = "";
